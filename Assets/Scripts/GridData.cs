@@ -14,15 +14,20 @@ public class GridData
     public int Height { get; private set; }
 
     private CellType[,] cells;
+    private TileAttributeData[,] attributes;
 
     public GridData(int width, int height)
     {
-        Width = width;
+        Width  = width;
         Height = height;
-        cells = new CellType[width, height];
+        cells  = new CellType[width, height];
+        attributes = new TileAttributeData[width, height];
         for (int x = 0; x < width; x++)
             for (int y = 0; y < height; y++)
-                cells[x, y] = CellType.Soil;
+            {
+                cells[x, y]      = CellType.Soil;
+                attributes[x, y] = TileAttributeData.Default;
+            }
     }
 
     public bool IsInside(int x, int y)
@@ -48,5 +53,17 @@ public class GridData
             return;
         }
         cells[x, y] = type;
+    }
+
+    public TileAttributeData GetTileAttribute(int x, int y)
+    {
+        if (!IsInside(x, y)) return TileAttributeData.Default;
+        return attributes[x, y];
+    }
+
+    public void SetTileAttribute(int x, int y, TileAttributeData attribute)
+    {
+        if (!IsInside(x, y)) return;
+        attributes[x, y] = attribute;
     }
 }

@@ -14,12 +14,18 @@ public class GridManager : MonoBehaviour
     {
         gridData = new GridData(width, height);
 
-        gridData.SetCell(EntrancePos.x,     EntrancePos.y,     CellType.Entrance);
-        gridData.SetCell(DemonLordRoomPos.x, DemonLordRoomPos.y, CellType.DemonLordRoom);
+        gridData.SetCell(EntrancePos.x,      EntrancePos.y,      CellType.Entrance);
+        gridData.SetCell(DemonLordRoomPos.x,  DemonLordRoomPos.y, CellType.DemonLordRoom);
+
+        // MVP 临时测试配置：预设带属性土块，用于验证挖掘自动生成逻辑。
+        // 后续将替换为正式地图配置或资源数据。
+        int[] testX = { 6, 10, 14, 18, 22 };
+        foreach (int tx in testX)
+            gridData.SetTileAttribute(tx, 9, new TileAttributeData(1, TileElementType.Slime));
 
         Debug.Log($"[GridManager] Grid initialized: {width}x{height}");
-        Debug.Log($"[GridManager] Entrance position: ({EntrancePos.x}, {EntrancePos.y})");
-        Debug.Log($"[GridManager] DemonLordRoom position: ({DemonLordRoomPos.x}, {DemonLordRoomPos.y})");
+        Debug.Log($"[GridManager] Entrance: ({EntrancePos.x},{EntrancePos.y}), DemonLordRoom: ({DemonLordRoomPos.x},{DemonLordRoomPos.y})");
+        Debug.Log("[GridManager] Test Slime attributes set at y=9, x=6/10/14/18/22.");
     }
 
     public bool DigCell(int x, int y)
@@ -47,5 +53,15 @@ public class GridManager : MonoBehaviour
     public GridData GetGridData()
     {
         return gridData;
+    }
+
+    public TileAttributeData GetTileAttribute(int x, int y)
+    {
+        return gridData.GetTileAttribute(x, y);
+    }
+
+    public void SetTileAttribute(int x, int y, TileAttributeData attribute)
+    {
+        gridData.SetTileAttribute(x, y, attribute);
     }
 }

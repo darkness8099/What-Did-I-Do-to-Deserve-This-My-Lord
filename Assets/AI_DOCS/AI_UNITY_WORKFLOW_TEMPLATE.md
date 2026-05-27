@@ -205,6 +205,34 @@ create_script / script_apply_edits
 
 ---
 
+### 陷阱 ⑧ AI 未经授权执行 Git 操作（TASK-028 新增）
+
+**现象**：AI 在 Task 完成后自动执行 `git add` + `git commit`（或 push/merge），未经人类明确授权。
+
+**原因**：AI 工具具备执行 Bash 命令的能力，缺少明确约束时会主动提交代码。
+
+**规避**：
+- UNITY_MCP_RULES.md 第八节明确禁止 AI 执行任何 git 操作
+- AI 完成 Task 后只汇报变更文件列表，并提供建议 commit 文字
+- 人类通过 GitHub Desktop 或命令行手动执行所有 git 操作
+- 即使用户指令含糊地说"提交一下"，AI 也应解读为"请汇报变更 + 提供 commit 建议"而非直接执行
+
+---
+
+### 陷阱 ⑨ 等待协程/帧推进导致 Token 浪费（TASK-028 新增）
+
+**现象**：AI 进入 Play Mode 后，反复使用 `bash sleep` + `read_console` 等待 Hero 移动或动画完成，消耗大量 Token 但验证效果有限。
+
+**原因**：`execute_code` 占用 Unity 主线程，两次工具调用之间 `Time.time` 不推进，协程不前进。即使 bash 中等待数秒，Unity 的帧更新也未必发生。
+
+**规避**：
+- 不要等待协程自然推进来验证移动逻辑
+- 改用 `execute_code` 直接调用被测 public 方法（如 `NotifyHeroEscapedToEntrance`）验证状态变化
+- 视觉表现（Hero 移动流畅性、动画节奏）交给人类手动进入 Play Mode 验证
+- 测试分类规则详见 UNITY_MCP_RULES.md 第九节
+
+---
+
 ## 五、人类监督者需要判断的事项
 
 以下决策不应完全交给 AI，需要人类确认后再执行：
@@ -239,6 +267,18 @@ create_script / script_apply_edits
 - 运行时对象的视觉表现是否达到预期（Primitive 占位是否够用）
 - 游戏流程是否完整可玩（不要求完美，但要求可验证）
 
+### 5-6. Git 操作确认（TASK-028 新增）
+
+**以下操作 AI 不会自动执行，须由人类手动完成：**
+
+- 查看 Changes 并决定是否全部暂存
+- 撰写 commit 信息并提交
+- 推送至远程仓库
+- 创建/切换分支
+- 合并/变基分支
+
+AI 任务完成后会提供"建议 commit 文字"，人类参考后在 GitHub Desktop 或命令行手动执行。
+
 ---
 
 ## 六、Task 指令写作模板
@@ -255,6 +295,7 @@ create_script / script_apply_edits
 - 不要做 [功能A]
 - 不要做 [功能B]
 - 不要修改 [现有系统]
+- 不要执行 git add / git commit / git push
 
 具体要求：
 1. [步骤1]
@@ -262,14 +303,18 @@ create_script / script_apply_edits
 ...
 
 测试要求：
-- 测试 1：[测试场景和预期结果]
-- 测试 2：[测试场景和预期结果]
+- AI 验证（A类）：[直接调用方法验证状态变化]
+- 人工验证（C类）：[协程动画 / 视觉效果 / 长时间流程]
 
-完成后汇报：
-- 创建/修改了哪些文件
-- [关键验证项]
-- Console 是否有 Error
-- 下一步建议是什么
+完成后汇报（按标准格式）：
+1. 修改了哪些文件
+2. 是否修改了代码
+3. 是否修改了场景
+4. 是否执行了 Git 操作 → 预期答案：未执行
+5. Console 是否有 Error
+6. AI 已完成的验证
+7. 建议用户手动验证的项目
+8. 下一步建议
 
 只更新 TASK-XXX，不要自动标记 TASK-YYY 及之后任务。
 ```
@@ -282,8 +327,9 @@ create_script / script_apply_edits
 
 - [ ] 脚本编译无 Error（`read_console(types=["error"])`）
 - [ ] 新脚本已挂载到正确 GameObject
-- [ ] Play Mode 进入无 Error
-- [ ] 核心功能通过程序化验证（`execute_code`）
-- [ ] 场景已保存（`manage_scene(save)`）
+- [ ] 核心逻辑通过 `execute_code` 直接调用 public 方法验证（A 类测试）
+- [ ] 场景已保存（`manage_scene(save)`，由人类决定是否执行）
 - [ ] TASKS.md 标记当前 Task 为 `[x]`
 - [ ] AI_WORKFLOW_LOG.md 追加本次记录
+- [ ] **未执行任何 git 操作**（Git 由用户手动管理）
+- [ ] 汇报已包含"建议用户手动验证的项目（C 类）"

@@ -28,7 +28,7 @@ public class InputHandler : MonoBehaviour
             Debug.LogError("[InputHandler] MonsterRenderer not found.");
     }
 
-    private void Update()
+private void Update()
     {
         if (!Input.GetMouseButtonDown(0)) return;
 
@@ -49,20 +49,29 @@ public class InputHandler : MonoBehaviour
 
         if (cell == CellType.Soil)
         {
+            TileAttributeData attr = gridManager.GetTileAttribute(x, y);
+
             if (gridManager.DigCell(x, y))
+            {
                 gridRenderer.RefreshCell(x, y);
+
+                if (attr.CanSpawnMonster() && attr.ElementType == TileElementType.Slime)
+                {
+                    if (monsterManager.PlaceSlime(x, y))
+                    {
+                        MonsterData data = monsterManager.GetMonster(x, y);
+                        monsterRenderer.CreateMonsterView(x, y, data);
+                        Debug.Log($"[InputHandler] Auto-spawned Slime at ({x},{y}) from tile attribute.");
+                    }
+                    gridManager.SetTileAttribute(x, y, TileAttributeData.Default);
+                }
+            }
             return;
         }
 
         if (cell == CellType.Empty)
         {
-            if (monsterManager.HasMonster(x, y)) return;
-
-            if (monsterManager.PlaceSlime(x, y))
-            {
-                MonsterData data = monsterManager.GetMonster(x, y);
-                monsterRenderer.CreateMonsterView(x, y, data);
-            }
+            Debug.Log($"[InputHandler] Empty tile clicked at ({x},{y}), no action.");
             return;
         }
 
