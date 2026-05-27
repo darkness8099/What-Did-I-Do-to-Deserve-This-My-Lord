@@ -853,4 +853,187 @@
 
 ---
 
+### 2026-05-27 TASK-023 — First Playable MVP 阶段总结
+
+**阶段：阶段 6 — 收尾与文档**
+
+---
+
+## ═══════════════════════════════════════
+## FIRST PLAYABLE MVP 总结
+## 项目：What Did I Do to Deserve This, My Lord
+## 完成日期：2026-05-27
+## ═══════════════════════════════════════
+
+---
+
+### 一、MVP 完成状态
+
+从空 Unity 项目（仅 SampleScene）出发，经过 TASK-000 至 TASK-022，完成以下完整闭环：
+
+```
+玩家点击 Soil → 挖成 Empty
+玩家点击 Empty → 放置 Slime
+Hero 从入口 (0,9) BFS 寻路 → 向魔王间 (31,9) 逐格移动
+Hero 进入 Slime 格 → 战斗（互相扣血，HP归零消灭）
+  ├── 所有 Hero 被击败 → Victory → 屏幕中央 VICTORY（黄色）
+  └── Hero 到达魔王间 → Defeat → 屏幕中央 DEFEAT（红色）
+```
+
+**数值基线（MVP）：**
+- Hero：HP=30，ATK=3，MoveSpeed=2（格/秒）
+- Slime：HP=10，ATK=2
+- 需要 5 只 Slime 才能击败 1 名 Hero（每只 Slime 消耗 6 HP，第 5 只在 Hero HP=6 时将其击败）
+
+---
+
+### 二、系统结构总览
+
+所有脚本（14 个）均挂载在场景中唯一的 **GridManager GameObject** 上。
+
+```
+GridManager (GameObject)
+├── GridData.cs          ← 纯 C# 数据层：网格状态、CellType 枚举、IsInside()
+├── GridManager.cs       ← 网格管理：初始化、DigCell()、GetCellType()
+├── GridRenderer.cs      ← 网格渲染：576 个 Quad Tile，颜色区分 CellType
+├── InputHandler.cs      ← 鼠标输入：点击转坐标、挖掘/放 Slime 分发
+├── MonsterData.cs       ← 纯 C# 数据层：Slime 属性（HP/ATK/Range）
+├── MonsterManager.cs    ← 魔物数据管理：PlaceSlime / HasMonster / RemoveMonster
+├── MonsterRenderer.cs   ← 魔物视图：运行时创建/删除 Quad GameObject
+├── HeroData.cs          ← 纯 C# 数据层：Hero 属性（HP/ATK/Speed）
+├── HeroManager.cs       ← 勇者数据管理：Spawn / GetHero / SetPosition / Remove
+├── HeroPathfinder.cs    ← BFS 寻路：GridData 引用（挖掘后自动感知新路径）
+├── HeroRenderer.cs      ← 勇者视图：运行时创建/删除 Quad GameObject
+├── HeroMover.cs         ← 勇者移动：协程驱动，逐格平滑移动，到达魔王间触发 Defeat
+├── CombatSystem.cs      ← 战斗结算：Hero 先攻，当格 Slime，HP 归零消灭
+├── MVPGameManager.cs    ← 胜负状态机：Playing / Victory / Defeat
+└── MVPResultUI.cs       ← 结果 UI：运行时创建 ScreenSpaceCamera Canvas + Text
+```
+
+**运行时对象层级（Play Mode）：**
+```
+Scene Root
+├── GridManager (持久场景对象，含上述所有组件)
+├── Main Camera
+├── Directional Light
+├── [Runtime] GridTiles           ← GridRenderer 创建，576 个 Quad
+├── [Runtime] MonsterViews        ← MonsterRenderer 创建
+├── [Runtime] HeroViews           ← HeroRenderer 创建
+└── [Runtime] ResultCanvas        ← MVPResultUI 创建（ScreenSpaceCamera Canvas）
+    └── ResultText                ← UnityEngine.UI.Text，64pt，居中
+```
+
+退出 Play Mode 后运行时对象全部自动清除，Edit Mode 无残留。
+
+---
+
+### 三、AI 制作流程经验
+
+#### 3-1. 有效的任务拆分原则
+
+每个 Task 控制在单一职责内，按以下顺序推进：
+
+```
+1. 数据层（纯 C# 类）
+2. 管理层（MonoBehaviour，控制数据）
+3. 表现层（MonoBehaviour，创建/更新 GameObject）
+4. 交互层（MonoBehaviour，处理输入或系统事件）
+5. 集成测试
+```
+
+本项目实践路径：
+```
+GridData → GridManager → GridRenderer → InputHandler（挖掘）
+→ MonsterData → MonsterManager → MonsterRenderer → InputHandler（放 Slime）
+→ HeroData → HeroManager → HeroPathfinder → HeroRenderer → HeroMover
+→ CombatSystem → MVPGameManager → MVPResultUI
+→ 端到端测试
+```
+
+#### 3-2. AI 工具调用最佳实践
+
+| 操作 | 推荐工具 |
+|------|---------|
+| 创建新脚本 | `create_script`（自动触发编译） |
+| 修改现有脚本 | `script_apply_edits`（结构化局部修改，优先于全文覆写） |
+| 等待编译 | `refresh_unity(wait_for_ready=true)` |
+| 确认无 Error | `read_console(types=["error"])` |
+| 验证逻辑 | `execute_code`（程序化模拟，比实时操作可靠） |
+| 视觉验证 | 在同一 `execute_code` 中完成"修改 + Camera.Render() + ReadPixels() + 保存"（因帧边界问题） |
+| 批量查询 | `batch_execute(parallel=true)`（减少往返次数） |
+
+#### 3-3. 关键经验与陷阱
+
+**① AI 范围蔓延（Scope Creep）**
+- 问题：AI 倾向于主动扩展任务（如"同时完成 TASK-X 和 TASK-Y"、自动标记后续任务）
+- 对策：每个 Task 指令中明确写"不要自动标记 TASK-XXX 及之后任务"
+
+**② 脚本整体覆写 vs 局部修改**
+- 问题：AI 在修改现有脚本时可能直接覆写全文，破坏原有逻辑
+- 对策：要求"优先使用 `script_apply_edits`（局部修改）"，禁止无必要的全文重写
+
+**③ "无 UnityEngine 依赖"的误解**
+- 问题：AI 有时把"不继承 MonoBehaviour"描述为"纯 C# 类，完全无 Unity 依赖"，但实际代码仍使用 `UnityEngine.Mathf` 等
+- 对策：明确区分"不继承 MonoBehaviour"和"不使用 UnityEngine 命名空间"，检查实际代码
+
+**④ Game View 无焦点时协程速度变慢**
+- 问题：Unity Editor 在 Game View 未获焦点时，Time.deltaTime 可能变慢，导致 Hero 移动看起来迟缓
+- 原因：这是 Unity Editor 行为（Background Throttling），不是 bug
+- 对策：在 Edit → Project Settings → Player → Resolution and Presentation → Run In Background 确认设置
+
+**⑤ MCP 工具调用与 Unity 帧边界**
+- 问题：`execute_code` 占用主线程，两次调用之间 Unity 的 Update() 不保证执行
+- 问题：`ScreenCapture.CaptureScreenshotAsTexture()` 在 Editor Play Mode 返回 null
+- 问题：`manage_camera(screenshot)` 不捕获 Screen Space Overlay Canvas
+- 对策：在单次 `execute_code` 中同时完成"状态修改 + UI 更新 + Camera.Render() + 截图"
+
+**⑥ Destroy() 的帧边界行为**
+- 问题：`Destroy(go)` 在同帧截图时视图仍然可见（Destroy 在帧末执行）
+- 原因：Unity 的正常行为，实际游戏中下一帧消失
+- 对策：测试时接受此视觉延迟，不误判为 bug
+
+**⑦ 人类负责方向决策，AI 负责执行**
+- 任务边界（做什么/不做什么）由人类决定，AI 严格执行
+- MVP 核心设计（如"点击 Empty 放 Slime"的简化规则）由人类拍板，AI 记录并实现
+- 当 AI 给出多种方案时，人类选择符合当前阶段目标的最简方案
+
+---
+
+### 四、当前已知限制（非 bug，MVP 设计决策）
+
+| 限制 | 说明 |
+|------|------|
+| Slime 不阻挡寻路 | BFS 将 Empty 格（含 Slime）视为可通行，Hero 不绕开 Slime |
+| 战斗时机 | 战斗在 Hero "抵达"该格后立即结算（非范围检测） |
+| Hero 立即生成 | 游戏开始后 Hero 立即从入口生成并等待路径（无延迟/波次系统） |
+| 放 Slime 方式 | 点击 Empty 格放置（非原版"挖开土块自动生成"） |
+| 无 Restart | 重新游戏需退出并重进 Play Mode |
+| 无美术资源 | 全部使用 Primitive Quad + Color 占位 |
+| 无血条/动画/音效 | 完全省略 |
+| 土块属性未实现 | 土块魔力/养分系统尚未实现 |
+
+---
+
+### 五、下一阶段候选方向（暂不实现）
+
+优先级仅供参考，最终由人类决定：
+
+**体验完善（较高优先）：**
+- [ ] Restart 功能（按键/按钮重置游戏）
+- [ ] Slime 阻挡 BFS 寻路（增加策略深度）
+- [ ] 操作提示 UI（告知玩家"点击挖/放"的规则）
+
+**规则还原（中等优先）：**
+- [ ] 土块魔力/养分属性系统
+- [ ] 挖开土块时根据属性自动生成对应魔物
+- [ ] 多 Hero 波次系统（间隔生成多名 Hero）
+
+**表现升级（可延后）：**
+- [ ] Sprite 美术资源替换（替代当前 Primitive/Color 占位）
+- [ ] Hero/Slime 血条显示
+- [ ] 战斗动画/特效
+- [ ] 音效
+
+---
+
 *后续每个 Task 完成后在此追加记录。*
