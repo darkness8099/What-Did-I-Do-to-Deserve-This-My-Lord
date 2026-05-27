@@ -744,4 +744,113 @@
 
 ---
 
+### 2026-05-27 TASK-021 — 最简 Victory / Defeat UI 显示
+
+**阶段：阶段 5 — 战斗与胜负**
+
+- **操作摘要**：
+  1. 读取 MVPGameManager.cs，确认 `GetCurrentState()` 方法与 `GameState` enum
+  2. `create_script` 创建 Assets/Scripts/MVPResultUI.cs（MonoBehaviour，运行时创建 Canvas + Text）
+  3. `refresh_unity` 等待编译，`read_console` 确认无 Error
+  4. `manage_components(add, MVPResultUI)` 挂载到 GridManager GameObject（instanceID 29580）
+  5. `manage_scene(save)` 保存 GameScene
+  6. `manage_editor(play)` 进入 Play Mode，Console 无 Error
+  7. `execute_code` + 相机渲染截图验证三种状态：Playing 无文字、Victory 显示 VICTORY、Defeat 显示 DEFEAT
+
+- **测试结果**（全部通过）：
+  - Playing 状态：无文字显示 ✓
+  - Victory 状态：屏幕中央黄色 "VICTORY" ✓
+  - Defeat 状态：屏幕中央红色 "DEFEAT" ✓
+  - Console 无 Error ✓
+
+- **调用工具**：
+  - `mcp__UnityMCP__create_script` (MVPResultUI.cs)
+  - `mcp__UnityMCP__script_apply_edits` (改 Canvas renderMode 为 ScreenSpaceCamera)
+  - `mcp__UnityMCP__refresh_unity` × 3
+  - `mcp__UnityMCP__read_console` × 多次
+  - `mcp__UnityMCP__manage_components` (add MVPResultUI)
+  - `mcp__UnityMCP__manage_scene` (save)
+  - `mcp__UnityMCP__manage_editor` (play/stop)
+  - `mcp__UnityMCP__execute_code` × 多次
+  - `mcp__UnityMCP__manage_camera` (screenshot)
+
+- **遇到的问题**：
+  - `manage_camera(screenshot)` 无法捕获 Screen Space Overlay Canvas（工具内部走相机渲染路径，不合成 Overlay）
+  - `ScreenCapture.CaptureScreenshotAsTexture()` 在 Editor Play Mode 下返回 null（仅在 Standalone Build 中有效）
+  - 解决：改用 `Camera.Render()` 渲染到 RenderTexture + `ReadPixels()` 同步读取，在单次 `execute_code` 中完成截图，避免帧间时序问题
+  - 初始使用 ScreenSpaceOverlay，后改为 ScreenSpaceCamera 以确保 Camera.Render() 路径能捕获 UI
+
+- **结论/经验**：
+  - MCP 工具调用之间 Unity 不保证运行帧（execute_code 占用主线程），导致 Update() 不在两次 MCP 调用之间执行
+  - 在一次 execute_code 调用中同时完成"状态修改 + UI 更新 + 截图"是验证 UI 渲染最可靠的方式
+  - ScreenSpaceCamera Canvas 比 ScreenSpaceOverlay 更适合 URP 项目（排序更可控、可被相机截图捕获）
+  - 字体 `Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")` 在 Unity 2022 中可用，无需额外依赖
+
+---
+
+### 2026-05-27 TASK-022 — MVP 端到端流程测试
+
+**阶段：阶段 5 — 战斗与胜负 / First Playable MVP 验证**
+
+#### MVP 核心闭环（已全部验证）
+
+| 功能 | 状态 |
+|------|------|
+| Dig soil（Soil → Empty） | ✓ |
+| Place Slime（点击 Empty） | ✓ |
+| Hero pathfinding（BFS，入口→魔王间） | ✓ |
+| Hero movement（平滑逐格，MoveSpeed=2） | ✓ |
+| Combat（Hero 先攻，HP 归零消灭） | ✓ |
+| Victory state（所有 Hero 被击败） | ✓ |
+| Defeat state（Hero 到达 DemonLordRoom） | ✓ |
+| Result UI（屏幕中央 VICTORY/DEFEAT 文字） | ✓ |
+
+#### 测试 A：Defeat 流程
+- 挖通 y=9 整行（30 格）
+- Hero 移动到 DemonLordRoom，State=Defeat
+- 屏幕中央显示红色 DEFEAT ✓
+- Console 无 Error ✓
+
+#### 测试 B：Victory 流程
+- 挖通 y=9，在 x=5/10/15/20/25 各放 1 只 Slime（共 5 只）
+- Hero HP 消耗路径：30→24→18→12→6→0（第 5 只 Slime 击败 Hero）
+- State=Victory，屏幕中央显示黄色 VICTORY ✓
+- Console 无 Error ✓
+
+#### 测试 C：基础交互保护（全部通过）
+- Entrance(0,9) 点击后 CellType 不变 ✓
+- DemonLordRoom(31,9) 点击后 CellType 不变 ✓
+- 同格重复放 Slime：第二次 PlaceSlime 返回 false ✓
+- OOB 坐标 (99,99) / (-1,-1)：IsInside=false，无 Error ✓
+- 游戏结束后 IsPlaying()=false，HeroMover 协程退出守卫生效 ✓
+
+#### 测试 D：层级与对象检查（全部通过）
+- 运行时对象：GridTiles(576子) / MonsterViews / HeroViews / ResultCanvas 均存在 ✓
+- GridManager 挂载 12 个组件（全系统集中在单个 GO） ✓
+- 退出 Play Mode 后运行时对象全部清除，Edit Mode 无残留 ✓
+
+- **调用工具**：
+  - `mcp__UnityMCP__manage_editor` (play/stop × 3)
+  - `mcp__UnityMCP__execute_code` × 多次
+  - `mcp__UnityMCP__read_console` × 多次
+  - `mcp__UnityMCP__batch_execute`
+  - `Read` (HeroMover.cs, CombatSystem.cs, InputHandler.cs, MonsterData.cs, HeroData.cs, MonsterRenderer.cs)
+
+- **遇到的问题**：
+  - 截图中 Slime 视图在战斗后仍可见：因为 `Destroy()` 在帧末执行，而相机渲染发生在同一 execute_code 调用中（帧末前）。实际游戏中 Slime 在下一帧正常消失，不是 bug。
+  - 本次测试均使用程序化方式（execute_code 模拟操作）而非等待实时移动，原因：Hero 移动全程约 15 秒，MCP 工具调用间 Unity 的帧处理时序不可控。
+
+- **结论/经验**：
+  - Hero(HP=30, ATK=3) 需要 5 只 Slime(HP=10, ATK=2) 才能被击败（每只 Slime 消耗 6 HP，第 5 只战斗中 Hero 血量不足）
+  - MVP 完整闭环验证通过，可判定为 **First Playable MVP**
+  - 已知限制（非 bug）：
+    - Slime 不阻挡 BFS 寻路，Hero 会穿过有 Slime 的格子（战斗在"抵达"时判定）
+    - MVP 使用"点击 Empty 放 Slime"简化规则（原版为触发放置）
+    - 暂无 Restart（需重进 Play Mode）
+    - 暂无正式美术资源（全部使用 Primitive/Color 占位）
+    - 暂无血条、动画、音效
+    - Hero 游戏开始后立即生成并等待路径（无延迟/波次系统）
+
+---
+
 *后续每个 Task 完成后在此追加记录。*
