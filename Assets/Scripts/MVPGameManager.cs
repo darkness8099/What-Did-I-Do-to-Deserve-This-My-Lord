@@ -23,9 +23,7 @@ public class MVPGameManager : MonoBehaviour
 
     public void NotifyHeroReachedDemonLordRoom(int heroId)
     {
-        if (!IsPlaying()) return;
-        CurrentState = GameState.Defeat;
-        Debug.Log($"[MVPGameManager] Game Over - Hero {heroId} reached DemonLordRoom.");
+        Debug.Log($"[MVPGameManager] Hero {heroId} reached DemonLordRoom — beginning return journey.");
     }
 
     public void NotifyHeroDefeated(int heroId)
@@ -37,4 +35,12 @@ public class MVPGameManager : MonoBehaviour
             Debug.Log("[MVPGameManager] Victory - All heroes defeated.");
         }
     }
+
+    public void NotifyHeroEscapedToEntrance(int heroId)
+    {
+        if (!IsPlaying()) return;
+        CurrentState = GameState.Defeat;
+        Debug.Log($"[MVPGameManager] Game Over - Hero {heroId} escaped with DemonLord through Entrance.");
+    }
+
 }

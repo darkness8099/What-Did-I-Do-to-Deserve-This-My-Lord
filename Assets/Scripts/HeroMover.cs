@@ -2,6 +2,8 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+public enum HeroRouteState { GoingToDemonLordRoom, ReturningToEntrance }
+
 public class HeroMover : MonoBehaviour
 {
     private GridManager    gridManager;
@@ -11,6 +13,7 @@ public class HeroMover : MonoBehaviour
     private MVPGameManager mvpGameManager;
 
     private static readonly Vector2Int DemonLordRoomPos = new Vector2Int(31, 9);
+    private static readonly Vector2Int EntrancePos        = new Vector2Int(0,  9);
 
     private IEnumerator Start()
     {
@@ -39,8 +42,8 @@ public class HeroMover : MonoBehaviour
 
     private IEnumerator MoveHero(int heroId)
     {
-        // GridData is a reference type — pathfinder sees dig updates automatically.
         var pathfinder = new HeroPathfinder(gridManager.GetGridData());
+        HeroRouteState routeState = HeroRouteState.GoingToDemonLordRoom;
 
         while (true)
         {
@@ -48,14 +51,26 @@ public class HeroMover : MonoBehaviour
             if (!mvpGameManager.IsPlaying()) yield break;
 
             Vector2Int currentPos = heroManager.GetHeroPosition(heroId);
+            Vector2Int goal = (routeState == HeroRouteState.GoingToDemonLordRoom)
+                ? DemonLordRoomPos : EntrancePos;
 
-            if (currentPos == DemonLordRoomPos)
+            if (currentPos == goal)
             {
-                mvpGameManager.NotifyHeroReachedDemonLordRoom(heroId);
-                yield break;
+                if (routeState == HeroRouteState.GoingToDemonLordRoom)
+                {
+                    Debug.Log($"[HeroMover] Hero {heroId} reached DemonLordRoom. Switching to return phase.");
+                    mvpGameManager.NotifyHeroReachedDemonLordRoom(heroId);
+                    routeState = HeroRouteState.ReturningToEntrance;
+                }
+                else
+                {
+                    mvpGameManager.NotifyHeroEscapedToEntrance(heroId);
+                    yield break;
+                }
+                continue;
             }
 
-            List<Vector2Int> path = pathfinder.FindPath(currentPos, DemonLordRoomPos);
+            List<Vector2Int> path = pathfinder.FindPath(currentPos, goal);
 
             if (path == null || path.Count < 2)
             {

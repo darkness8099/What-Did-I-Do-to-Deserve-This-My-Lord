@@ -1036,4 +1036,143 @@ GridData → GridManager → GridRenderer → InputHandler（挖掘）
 
 ---
 
+### 2026-05-27 TASK-025 — 土块魔力 / 元素属性数据层
+
+**阶段：阶段 7 — 土块属性与自动生成系统**
+
+- **操作摘要**：
+  1. 创建 `Assets/Scripts/TileAttributeData.cs`（纯 C# struct，无 MonoBehaviour）
+     - 枚举 `TileElementType { None, Slime }`
+     - struct `TileAttributeData { MagicPower, ElementType, CanSpawnMonster(), Default }`
+  2. `script_apply_edits` 对 `GridData.cs` 做 4 处局部修改：
+     - 新增字段 `TileAttributeData[,] attributes`
+     - 构造函数初始化 `attributes`（每格默认 Default）
+     - 新增方法 `GetTileAttribute(x, y)`（越界返回 Default）
+     - 新增方法 `SetTileAttribute(x, y, attr)`（越界直接 return）
+  3. `Edit` 修正缩进（script_apply_edits 局部插入存在轻微缩进偏移）
+  4. `refresh_unity` 等待编译，`read_console` 确认零 Error
+  5. `execute_code` 运行 6 项测试，全部通过
+  6. 更新 `GAME_DESIGN_BASE.md`，新增"正式规则方向"章节
+  7. 更新 `TASKS.md`（新增阶段 7 + TASK-025/026）
+
+- **测试结果**（全部通过）：
+  - 测试1：新建 GridData 默认属性 MagicPower=0, ElementType=None, CanSpawn=false ✓
+  - 测试2：SetTileAttribute(Slime, MP=1) → CanSpawnMonster()=true ✓
+  - 测试2b：MagicPower=5 但 ElementType=None → CanSpawn=false ✓
+  - 测试3：越界 GetTileAttribute(99,99) 返回安全默认值，无 Error ✓
+  - 测试3b：越界 SetTileAttribute 不抛异常 ✓
+  - 测试4：现有 CellType 行为不变，GetCell 返回正确值 ✓
+
+- **调用工具**：
+  - `mcp__UnityMCP__create_script` (TileAttributeData.cs)
+  - `mcp__UnityMCP__script_apply_edits` (GridData.cs × 2 次，共 4 个 edit)
+  - `Edit` (GridData.cs 缩进修正)
+  - `mcp__UnityMCP__refresh_unity` × 2
+  - `mcp__UnityMCP__read_console` × 2
+  - `mcp__UnityMCP__execute_code`
+
+- **遇到的问题**：
+  - `script_apply_edits` 中第 4 个 edit（`insert_method after GetTileAttribute`）在同批次执行时找不到锚点，因为 GetTileAttribute 在同批次第 3 个 edit 中才被插入，工具看到的是修改前的文件。分两次调用（3+1）解决。
+  - 局部插入后 `public` 关键字缩进偏移（漏掉前导 4 空格），用 `Edit` 工具修正。
+
+- **结论/经验**：
+  - `script_apply_edits` 同批次 edits 基于同一原始文件状态计算锚点，不会累积前序 edit 的结果。若后序 edit 依赖前序 edit 新增的方法名作为锚点，必须分批（两次调用）执行。
+  - `TileAttributeData` 设计为 struct（值类型），适合网格密集数据，不产生 GC 压力。
+  - `Default` 静态属性（`MagicPower=0, ElementType=None`）统一表达"无属性土块"，避免散落的魔法数字。
+  - 本次严格遵守"只做数据层"限制：InputHandler、MonsterManager、DigCell 行为均未改变。
+
+### 2026-05-27 TASK-026 — 挖掘自动生成魔物逻辑
+
+**阶段：阶段 7 — 土块属性与自动生成系统**
+
+- **操作摘要**：
+  1. `script_apply_edits` 修改 `GridManager.cs`：
+     - `Awake()` 中新增临时测试属性配置（y=9, x=6/10/14/18/22, MagicPower=1, Slime）
+     - 新增 `GetTileAttribute(x,y)` 包装方法（委托给 GridData）
+     - 新增 `SetTileAttribute(x,y,attr)` 包装方法（委托给 GridData）
+  2. `script_apply_edits` 修改 `InputHandler.cs`：
+     - `Update()` Soil 分支：先读取属性 → 挖掘 → RefreshCell → CanSpawnMonster 判断 → 自动生成 → 清空属性
+     - `Update()` Empty 分支：移除手动放 Slime，改为 Debug.Log 无操作
+  3. `Edit` 修正两处缩进偏移
+  4. `refresh_unity` 等待编译，`read_console` 确认零 Error
+  5. `manage_editor(play)` 进入 Play Mode，运行 5 项测试
+  6. 截图确认路径挖通后 Slime 自动生成位置正确
+  7. 更新 `GAME_DESIGN_BASE.md`（规则变更）、`TASKS.md`
+
+- **测试结果**（全部通过）：
+  - 测试1：普通 Soil(3,9) 挖开 → Empty，无 Slime 生成 ✓
+  - 测试2：带属性 Soil(6,9) 挖开 → Empty + Slime 自动生成 + 属性清空 ✓
+  - 测试3：点击 Empty(3,9) → 无操作，无 Slime ✓
+  - 测试4：Entrance/DemonLordRoom 不可挖，无 Slime 生成 ✓
+  - 测试5：带属性 Soil(10,9) 挖开生成 Slime，Hero 到达触发战斗，Slime 被击败，状态=Playing ✓
+  - 截图：路径挖通后 4 只 Slime（x=6/14/18/22）自动出现，x=10 在测试战斗中被消灭 ✓
+  - Console 全程零 Error ✓
+
+- **调用工具**：
+  - `mcp__UnityMCP__script_apply_edits` (GridManager.cs × 2，InputHandler.cs × 1)
+  - `Edit` (GridManager.cs 缩进修正 × 2)
+  - `mcp__UnityMCP__refresh_unity`
+  - `mcp__UnityMCP__read_console` × 2
+  - `mcp__UnityMCP__manage_editor` (play/stop)
+  - `mcp__UnityMCP__execute_code` × 2
+  - `mcp__UnityMCP__manage_scene` (save)
+
+- **规则变更记录**：
+  - 旧规则：点击 Soil → Empty；点击 Empty → 手动放 Slime
+  - 新规则：点击 Soil → Empty；若 CanSpawnMonster() → 自动生成魔物；点击 Empty → 无操作
+
+- **结论/经验**：
+  - InputHandler 承担"点击流程编排"职责（读属性 → 挖掘 → 判断 → 生成 → 清属性），GridManager 保持对地图操作的单一职责，两者职责边界清晰
+  - 属性必须在 DigCell **之前**读取：DigCell 不改变属性，但如果先挖再读属性也能工作；然而语义上"属性属于土块"，挖掉土块后清空属性，读取应在挖掘前，逻辑更清晰
+  - `GridManager` 的包装方法（GetTileAttribute / SetTileAttribute）使 InputHandler 不直接依赖 GridData，保持了层次隔离
+
+### 2026-05-27 TASK-027 — 勇者目标逻辑：找到魔王后返回入口才失败
+
+**阶段：阶段 8 — 勇者目标逻辑扩展**
+
+- **操作摘要**：
+  1. `script_apply_edits` 修改 `HeroMover.cs`（3 个 edit）：
+     - `anchor_insert`：在类声明前添加顶层枚举 `HeroRouteState { GoingToDemonLordRoom, ReturningToEntrance }`
+     - `anchor_replace`：在 `DemonLordRoomPos` 字段后追加 `EntrancePos = new Vector2Int(0, 9)`
+     - `replace_method`：重写 `MoveHero` 协程，实现两阶段逻辑（到达魔王 → 切换目标为入口 → 到达入口触发 Defeat）
+  2. `script_apply_edits` 修改 `MVPGameManager.cs`（2 个 edit）：
+     - `replace_method`：`NotifyHeroReachedDemonLordRoom` 改为仅打印日志，不再触发 Defeat
+     - `insert_method after NotifyHeroDefeated`：新增 `NotifyHeroEscapedToEntrance` 触发 Defeat
+  3. `Edit` 修正 3 处缩进偏移（HeroMover line 43、MVPGameManager line 24、line 39）
+  4. `refresh_unity(compile=request, wait_for_ready=true)` — 编译成功
+  5. `read_console(types=["error"])` — 零 Error
+  6. 进入 Play Mode，通过 4 项逻辑单元测试（见下方）
+  7. 更新 `GAME_DESIGN_BASE.md`（勇者规则）、`TASKS.md`
+
+- **测试结果**（全部通过）：
+  - 测试1：`NotifyHeroReachedDemonLordRoom` → 状态保持 Playing（不触发 Defeat） ✓
+  - 测试2：`NotifyHeroEscapedToEntrance` → 状态变为 Defeat ✓
+  - 测试3：所有勇者被击败（`RemoveHero` + `NotifyHeroDefeated`）→ Victory ✓
+  - 测试4：`NotifyHeroEscapedToEntrance` 在非 Playing 状态下被忽略 ✓
+
+- **调用工具**：
+  - `mcp__UnityMCP__script_apply_edits` (HeroMover.cs × 1，MVPGameManager.cs × 1)
+  - `Edit` (缩进修正 × 3)
+  - `mcp__UnityMCP__refresh_unity`
+  - `mcp__UnityMCP__validate_script` (HeroMover.cs)
+  - `mcp__UnityMCP__read_console` × 多次
+  - `mcp__UnityMCP__manage_editor` (play × 3，stop × 3)
+  - `mcp__UnityMCP__execute_code` × 多次
+
+- **调试记录（Unity MCP 时序问题）**：
+  - `IEnumerator Start()` 中 `yield return null` 导致初始化日志在首次 read_console 时不可见，因为 MCP 工具调用期间 Unity 主线程被占用，协程无法推进。等待一段时间后（bash sleep）仍然如此，因为 MCP WebSocket 服务端持续占用主线程。
+  - 解决方案：通过 `execute_code` 读取 `Time.time` 并检查私有字段（反射），确认协程最终确实执行了（`gridManager != null`）；对逻辑层直接调用公开方法进行单元测试，不依赖协程动画推进。
+  - 经验：Unity Play Mode 下，`Time.time` 在 execute_code 调用之间不会推进，说明 MCP 占用主线程。行为测试应优先用 `execute_code` 直接调用被测方法，而不是等待游戏帧推进。
+
+- **规则变更记录**：
+  - 旧规则：勇者到达 DemonLordRoom → 立即 Defeat
+  - 新规则：勇者到达 DemonLordRoom → 切换为返回模式 → 返回 Entrance → Defeat
+  - 勇者途中被击败的处理逻辑（Victory 条件）不变
+
+- **结论/经验**：
+  - `HeroPathfinder.FindPath(start, goal)` 已支持任意起点/终点 BFS，无需修改即可复用于返回阶段（只需切换 goal 参数）
+  - `HeroRouteState` 枚举放在文件顶层（类外）是合法的 C# 做法，Unity 能正常编译
+  - `script_apply_edits` 的 `anchor_replace` 用正则表达式匹配字段声明行，适合精确替换单行内容
+  - 协程状态（`routeState` 局部变量）天然私有，无需向外暴露字段，保持了 HeroMover 的封装性
+
 *后续每个 Task 完成后在此追加记录。*
