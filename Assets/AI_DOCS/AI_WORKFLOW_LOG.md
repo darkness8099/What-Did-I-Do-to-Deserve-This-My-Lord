@@ -1215,4 +1215,51 @@ GridData → GridManager → GridRenderer → InputHandler（挖掘）
   | 汇报格式 | 不固定 | 8 项标准格式，含 Git 操作状态 |
   | Unity 时间推进 | 未记录 | 明确记录 MCP 占用主线程限制 |
 
+---
+
+### 2026-05-29 TASK-029B — 创建美术资源接入规则与命名规则文档
+
+**阶段：阶段 9 — 美术资源接入与目录规范**
+
+- **任务目标**：
+  - 为合作美术资源进入 Unity 项目设立明确的目录、暂存、命名规则
+  - 不创建任何实际目录（`Assets/Art/` 留到 TASK-029C 再建）
+  - 不导入任何美术资源（留到 TASK-029D 起）
+  - 仅产出规则文档，作为后续 029C–F 的依据
+
+- **本次新增 / 修改文件**：
+
+  **新建**：
+  - `Assets/AI_DOCS/ART_INTAKE_RULES.md` — 目录结构（`Art/` + `Art/_Incoming/`）、两段式存放（项目外 `D:\Game Art Drops\` → 项目内 `_Incoming/`）、Import Setting 默认值、风险与红线、与既有规则的关系
+  - `Assets/AI_DOCS/ART_NAMING_RULES.md` — 命名核心原则（snake_case 资源 vs PascalCase 代码）、各类资源命名模板（tile_ / hero_ / monster_ / demonlord_ / ui_ / bg_ / prop_ / fx_ / mat_ / anim_ / prefab）、CellType 与 Slime / Hero 的对应命名、红线（不强制改名原始包）
+  - `Assets/AI_DOCS/ART_INTAKE_LOG.md` — 批次接入记录表（空模板：批次日期 / 批次名 / 件数 / 类别 / 处理结果 / 执行人）
+
+  **修改**：
+  - `Assets/AI_DOCS/TASKS.md` — 新增「阶段 9：美术资源接入与目录规范」，包含 TASK-029A–F 六个子任务，TASK-029B 标记为 `[x]`
+
+- **设计要点回顾（来自 TASK-029 Proposal）**：
+  - 两段式存放策略平衡"Unity 不自动导入"与"git 可追溯"两个需求
+  - 命名 `snake_case` 与代码 `PascalCase` 形成视觉区分，避免查找混淆
+  - 不规划 `Animations/` / `Materials/` / `Shaders/` 子目录，留到真正需要时再生
+  - DemonLord 单独分类，不埋进 Monsters/，因为它是叙事核心 + 失败判定点
+
+- **调用工具**：
+  - `Read`（4 次：TASKS.md / GAME_DESIGN_BASE.md / UNITY_MCP_RULES.md / AI_UNITY_WORKFLOW_TEMPLATE.md，全部只读）
+  - `Glob`（1 次：Assets/* 目录扫描，确认 `Art/` 尚未存在）
+  - `Grep`（2 次：定位 AI_WORKFLOW_LOG 末尾 trailer）
+  - `Write`（3 次：3 份新文档）
+  - `Edit`（2 次：TASKS.md 追加阶段 9 / AI_WORKFLOW_LOG.md 追加本条记录）
+  - **未调用任何 Unity MCP 工具**（纯文档任务，无 Editor 状态变化）
+
+- **结论 / 经验**：
+  - 美术资源接入规则与既有 UNITY_MCP_RULES 第三节"创建资源命名规范"形成互补，未发生冲突
+  - 规则文档先行的好处：029C 之后无论由人类还是 AI 创建目录 / 移动文件，都有同一份参照
+  - `ART_INTAKE_LOG.md` 空模板可立即使用，无需等到首批资源到位
+  - 本规则仅定义"如何接入"，不预设具体美术风格 / 像素密度 / 调色板 —— 这些由 GAME_DESIGN_BASE.md 后续阶段决定
+
+- **后续建议**：
+  - **TASK-029A** 待合作美术资源包到位后启动（只读清单分析）
+  - **TASK-029C** 可独立于 029A 推进（建空目录骨架，零风险）
+  - **TASK-029D–F** 须等具体资源到位
+
 *后续每个 Task 完成后在此追加记录。*
