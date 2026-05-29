@@ -22,7 +22,9 @@
 
 | 批次日期 | 批次名 | 件数 | 类别 | 处理结果 | 执行人 |
 |---|---|---|---|---|---|
-| _(尚无批次接入)_ | | | | | |
+| 2026-05-29 | initial_pack（地底组）—— Tiles | 3 | Tiles | OK — `tile_soil_surface_00` / `tile_soil_deep_00` / `tile_entrance_default_00` 导入 `Art/Tiles/` | AI 协助 |
+| 2026-05-29 | initial_pack（地底组）—— Characters | 2 | Heroes / Monsters | OK — `hero_warrior_idle_00` → `Art/Characters/Heroes/`；`monster_slime_idle_00` → `Art/Characters/Monsters/` | AI 协助 |
+| 2026-05-29 | initial_pack（地底组）—— DemonLord | 1 | DemonLord | OK — `demonlord_idle_00` → `Art/DemonLord/`（入库待用，暂无代码引用） | AI 协助 |
 
 ---
 

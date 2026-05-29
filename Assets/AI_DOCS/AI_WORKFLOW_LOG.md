@@ -1262,4 +1262,270 @@ GridData → GridManager → GridRenderer → InputHandler（挖掘）
   - **TASK-029C** 可独立于 029A 推进（建空目录骨架，零风险）
   - **TASK-029D–F** 须等具体资源到位
 
+---
+
+### 2026-05-29 TASK-029A — 首批美术资源命名 / 分类 / 目录映射（只读分析）
+
+**阶段：阶段 9 — 美术资源接入与目录规范**
+
+- **任务目标**：
+  - 对合作美术首批 6 张 PNG 做只读分析（位于 `D:\Game Developer Tools\Game Art Drops\MyLord\地底\`）
+  - 按 `ART_NAMING_RULES.md` 给出英文命名 / 目标目录映射
+  - 不重命名、不复制、不导入；产出"导入决策表"作为 TASK-029D 的输入
+
+- **资源包现状**：
+  - 6 张 PNG，全部 **48×48 像素**，~17-21 KB
+  - 文件名 5 张中文 + 1 张英文（`Demon Lord.png` 含空格，原 `魔王1.png` 已由用户改名）
+
+- **关键决策（与用户对齐后）**：
+
+  | # | 决策 | 结果 |
+  |---|---|---|
+  | Q1 | `地皮 / 地底` 是 Soil 的两个变体（不是 Soil vs Empty） | Empty 格用黑色背景表达，**不需要 sprite** |
+  | Q2 | DemonLord 文件唯一（确认） | 命名 `demonlord_idle_00`，无序号歧义 |
+  | Q3 | Pixels Per Unit | **48**（一格 grid = 1 Unity unit，与现有 `GridManager` 对齐） |
+  | Q4 | DemonLord 代码归属 | 当前 `HeroData` / `MonsterData` 是独立 POCO，**无统一基类**。DemonLord 系统待未来"统一生物基类" 架构决策后再定。本批仅入库素材，不上场景 |
+
+  **代码架构现状（Q4 check 结果）**：
+  - `HeroData`：纯 POCO，无 `using UnityEngine`，使用 `System.Math.Max`
+  - `MonsterData`：纯 POCO + `using UnityEngine`（用了 `Mathf.Max` + `Debug.LogWarning`）
+  - 两者字段几乎同形（`MaxHP / CurrentHP / Attack / IsAlive() / TakeDamage()`），但**未抽公共基类**
+  - 16 个 `.cs` 文件全部平铺在 `Assets/Scripts/`，无子目录
+  - 未发现 `Creature.cs` / `Entity.cs` / `Actor.cs` / `Character.cs` 任何候选基类
+
+- **本次产出的命名 / 目录映射表**（TASK-029D 之后的依据）：
+
+  | 原文件 | 英文命名 | 目录 |
+  |---|---|---|
+  | `地皮.png` | `tile_soil_surface_00.png` | `Assets/Art/Tiles/` |
+  | `地底.png` | `tile_soil_deep_00.png` | `Assets/Art/Tiles/` |
+  | `入口.png` | `tile_entrance_default_00.png` | `Assets/Art/Tiles/` |
+  | `勇者.png` | `hero_warrior_idle_00.png` | `Assets/Art/Characters/Heroes/` |
+  | `史莱姆.png` | `monster_slime_idle_00.png` | `Assets/Art/Characters/Monsters/` |
+  | `Demon Lord.png` | `demonlord_idle_00.png` | `Assets/Art/DemonLord/` |
+
+- **本次推荐的 Import Setting**（TASK-029D 应用）：
+  - Texture Type: `Sprite (2D and UI)`
+  - Sprite Mode: `Single`
+  - Filter Mode: **`Point (no filter)`**（像素风必需）
+  - Compression: **`None`**（48×48 文件极小，启压缩反损质量）
+  - Pixels Per Unit: **`48`**（一格 = 1 Unity unit）
+  - Mesh Type: `Full Rect`
+  - Generate Mip Maps: **关闭**
+  - Pivot: `Center`
+
+- **调用工具**：
+  - `PowerShell`（4 次：列文件、列尺寸、再次确认 Demon Lord 文件唯一性、UTF-8 编码处理）
+  - `Read`（6 次美术 PNG + 2 次代码文件 `HeroData.cs` / `MonsterData.cs`，全部只读）
+  - `Glob`（1 次：列 `Assets/Scripts/*.cs` 确认无基类文件）
+  - `Edit`（2 次：本次 TASKS.md 标记 029A 完成 + 本条 AI_WORKFLOW_LOG 追加）
+  - **未调用任何 Unity MCP 工具**（资源仍在项目外，未触发 Unity 感知）
+  - **未触发任何 git 操作**
+
+- **风险结论（待 TASK-029C/D 落地时复查）**：
+  - 中英文混名：5 中 1 英。重命名只在 `_Incoming/ → Art/` 那一步发生，原文件保留
+  - 文件名含空格（`Demon Lord.png`）：移动时去空格变 `demonlord_idle_00.png`
+  - DemonLord 入库后**无代码引用**：是预期行为，留作未来"统一生物基类" Task 的素材
+  - 48×48 + PPU=48 决策：与现有世界尺度一致，未来若混入其他像素密度需补"规格混合策略"
+
+- **未涵盖事项（留给后续 Task）**：
+  - 缺失资源：`Wall` 边界 tile、未来动画帧序列、UI 资源、背景大图
+  - "Soil 双变体如何选用"的逻辑（`GridRenderer` 内随机？按位置？）—— 属于 TASK-030 范畴
+  - DemonLordRoom 格的视觉（是用 `demonlord_idle_00` 作 overlay 还是另出专属 tile）
+
+- **下一步**：
+  - TASK-029C — 在 `Assets/Art/` 下创建分类空目录骨架（不依赖任何外部资源，可立即推进）
+  - TASK-029D — 用本提案的命名 / 目录 / Import Setting 映射表，把 6 张图走完整 import 流程（2 张 Soil 试验已完成）
+
+---
+
+### 2026-05-29 TASK-029C — 创建 `Assets/Art/` 分类空目录骨架
+
+**阶段：阶段 9 — 美术资源接入与目录规范**
+
+- **任务目标**：
+  - 按 `ART_INTAKE_RULES.md § 一` 建立 `Assets/Art/` 下所有分类目录
+  - 每个 leaf 目录放一个 `.gitkeep` 让 git 跟踪空目录
+  - 不导入任何美术资源（留给 TASK-029D）
+
+- **执行前状态**：
+  - `Assets/Art/` 不存在（Glob 验证）
+  - Unity editor_state: `ready_for_tools=true`，无编译中，无 domain reload pending
+
+- **本次新增目录**（14 个目录 + 11 个 `.gitkeep`）：
+
+  ```
+  Assets/Art/
+  ├── Tiles/                .gitkeep
+  ├── Characters/
+  │   ├── Heroes/           .gitkeep
+  │   └── Monsters/         .gitkeep
+  ├── DemonLord/            .gitkeep
+  ├── UI/
+  │   ├── Icons/            .gitkeep
+  │   ├── Panels/           .gitkeep
+  │   └── Fonts/            .gitkeep
+  ├── Backgrounds/          .gitkeep
+  ├── Props/                .gitkeep
+  ├── FX/                   .gitkeep
+  └── _Incoming/            .gitkeep
+  ```
+
+  > 与 `ART_INTAKE_RULES.md § 一` 完全一致；**不创建** `Animations/` / `Materials/` / `Shaders/`（按规则延后到真正需要时）。
+
+- **Unity 感知验证**：
+  - `refresh_unity(mode=force, scope=assets)` 触发 AssetDatabase 扫描
+  - 14 个 `.meta` 文件由 Unity 自动生成（每个目录一个，含根 `Art.meta`）
+  - `.gitkeep` 文件**未生成** `.meta`：Unity 默认忽略以 `.` 开头的 dotfile，符合预期，避免 .meta 噪音
+  - `read_console(types=[error,warning])`：仅 2 条**原有**警告（Unity 管理员权限提示，与本任务无关），**无新 error / warning**
+
+- **调用工具**：
+  - `ReadMcpResourceTool`（1 次：`editor_state` 预检）
+  - `Glob`（3 次：预检 `Art/` 不存在 / 验证 `Art\**\*.meta` / 验证根 `Art.meta`）
+  - `PowerShell`（1 次：批量建目录 + `.gitkeep`，并打印最终树）
+  - `mcp__unity-mcp__refresh_unity`（1 次：force / assets）
+  - `mcp__unity-mcp__read_console`（1 次：error/warning 检查）
+  - `Edit`（2 次：本次 TASKS.md 标记 / 本条 LOG 追加）
+  - **未执行任何 git 操作**
+
+- **结论 / 经验**：
+  - PowerShell 批量建 dir + `.gitkeep` 后 `refresh_unity` 是干净的"外部变更感知"流程，不引发任何 Editor 错误
+  - Unity 自动忽略 `.gitkeep` 是已知行为；不需要额外的 `.unityignore` 或排除规则
+  - 中间层目录（`Art/Characters/` / `Art/UI/`）**不需要** `.gitkeep`，因为子目录已有 `.gitkeep`，git 会跟踪整条路径
+  - `_Incoming/` 当前是 `.gitkeep` 占位；TASK-029D 之后会出现 `_Incoming/2026-05-29_initial_pack/` 子目录
+
+- **风险复查**：
+  - ✅ 未污染 `Assets/` 根：所有新增都在 `Assets/Art/` 下
+  - ✅ 未覆盖现有资源：执行前 Glob 确认 `Art/` 不存在
+  - ✅ 未触发 Unity 编译：纯目录 + dotfile，无 `.cs` 变化
+  - ✅ 未进入 Play Mode
+  - ✅ 未执行 git 操作
+
+- **下一步**：
+  - TASK-029D — 在 `Art/_Incoming/2026-05-29_initial_pack/` 复制 6 张 PNG（保留中文原名）→ 应用 Import Setting → 重命名 + 移动到目标目录 → 追加 `ART_INTAKE_LOG.md` 一行
+  - 注：029D 是**首次让 Unity 感知美术资源**，会生成 `.png.meta`（GUID 锁定）。建议作为独立明确授权步骤执行
+
+---
+
+### 2026-05-30 TASK-029D — 首批 Soil sprite 导入（tile_soil_surface / tile_soil_deep）
+
+**阶段：阶段 9 — 美术资源接入与目录规范**
+
+- **任务目标**：把 `地皮.png` / `地底.png` 以规范英文命名走完整 import 流程，作为后续 6 张全量导入的试验基准
+
+- **执行步骤**：
+  1. 步骤 0：更新 `ART_NAMING_RULES.md`（帧动画前向兼容、`_00`=帧序号、Soil 多变体、进 Unity 即英文命名）和 `ART_INTAKE_RULES.md`（去批次子目录、PPU 写死 48、接入流程简化）
+  2. PowerShell `Copy-Item` 从项目外复制两张 PNG 到 `Assets/Art/_Incoming/`，同步改为英文名
+  3. `refresh_unity(force, assets)` → Unity 自动 import，生成两个 `.meta`，GUID 锁定
+  4. `manage_asset(modify)` 尝试设 Import Setting → **PPU / Compression 未生效**（property key 不匹配）
+  5. 改用 `execute_code` 直接操作 `TextureImporter` API → PPU=48、Point、Uncompressed、Single、no mipmaps，`SaveAndReimport()`
+  6. `execute_code` 二次验证：全部参数正确 ✓
+  7. `manage_asset(move)` 尝试 → **失败**（MoveAsset 内部错误）
+  8. `execute_code` 调用 `AssetDatabase.MoveAsset()` → 返回 "invalid path" 但实际已完成移动（FindAssets 验证确认）
+  9. `execute_code` 最终验证：两张 PNG 在 `Assets/Art/Tiles/`，GUID 不变，Import Setting 全部正确，`_Incoming` 清空 ✓
+
+- **最终状态**：
+
+  | 文件 | 路径 | GUID | PPU | Filter | Compression |
+  |---|---|---|---|---|---|
+  | `tile_soil_surface_00.png` | `Assets/Art/Tiles/` | `876fa777...` | 48 | Point | Uncompressed |
+  | `tile_soil_deep_00.png` | `Assets/Art/Tiles/` | `461b2a56...` | 48 | Point | Uncompressed |
+
+- **调用工具**：
+  - `ReadMcpResourceTool`（1 次：editor/state）
+  - `Read`（2 次：ART_NAMING_RULES.md / ART_INTAKE_RULES.md 步骤 0 用）
+  - `Glob`（3 次：预检 / .meta 验证 / 位置确认）
+  - `PowerShell`（1 次：Copy-Item）
+  - `mcp__unity-mcp__refresh_unity`（1 次）
+  - `mcp__unity-mcp__manage_asset(modify)`（2 次，PPU/Compression 未生效，陷阱记录）
+  - `mcp__unity-mcp__execute_code`（4 次）
+  - `mcp__unity-mcp__read_console`（2 次）
+  - `Edit`（8 次：规则文档 + 本次收尾）
+  - **未执行任何 git 操作**
+
+- **经验 / 陷阱**：
+  - **`manage_asset(modify)` 的 property key 与 TextureImporter 字段名不对应**：`pixelsPerUnit` 未映射到 `spritePixelsPerUnit`，后续所有 Import Setting 直接用 `execute_code + TextureImporter API`
+  - **`AssetDatabase.MoveAsset()` 在 `SaveAndReimport()` 后可能返回 "invalid path" 但实际已移动**：用 `FindAssets` 验证位置才可信，不要只看返回值
+  - **`execute_code + TextureImporter` 是最可靠的 Import Setting 路径**
+
+- **下一步**：
+  - D5：剩余 4 张（`入口.png` / `勇者.png` / `史莱姆.png` / `Demon Lord.png`）导入 —— 等用户决定
+  - TASK-030（待定）：`GridRenderer` 接入 Soil sprite
+
+---
+
+### 2026-05-30 TASK-029D（D5 补充）— 剩余 4 张全量导入
+
+**阶段：阶段 9 — 美术资源接入与目录规范**
+
+- 复用 D3 的完整流程（PowerShell Copy + execute_code TextureImporter + AssetDatabase.MoveAsset）
+- 4 张全部 MOVED 成功（这次 MoveAsset 返回值正确）
+- 最终位置与 Import Setting 验证：
+
+  | 文件 | 路径 | PPU | Filter | Size |
+  |---|---|---|---|---|
+  | `tile_entrance_default_00.png` | `Art/Tiles/` | 48 | Point | 48×48 |
+  | `hero_warrior_idle_00.png` | `Art/Characters/Heroes/` | 48 | Point | 48×48 |
+  | `monster_slime_idle_00.png` | `Art/Characters/Monsters/` | 48 | Point | 48×48 |
+  | `demonlord_idle_00.png` | `Art/DemonLord/` | 48 | Point | 48×48 |
+
+- 调用工具：PowerShell(1) / refresh_unity(1) / execute_code(2) / read_console(1) / Edit(3)
+- 未执行 git 操作
+
+---
+
+### 2026-05-30 TASK-030 — GridRenderer 接入 Soil sprite
+
+**阶段：阶段 9 — 美术资源接入与目录规范**
+
+- **修改内容**：`Assets/Scripts/GridRenderer.cs`（全方法重构，保持公共接口不变）
+
+  | 变更 | 旧 | 新 |
+  |---|---|---|
+  | 渲染方式 | `Quad` + `MeshRenderer` + 4 个 `Material` | `SpriteRenderer`（URP 2D 正式管线） |
+  | Soil 渲染 | 纯色 Material | `spriteSoilSurface`（上半区）/ `spriteSoilDeep`（下半区） |
+  | 空洞(Empty) | 深灰色 Material | `_whitePlaceholder` + `ColorEmpty`（暗色，camera bg 穿透） |
+  | Entrance / DemonLordRoom | 纯色 Material | `_whitePlaceholder` + 对应 Color |
+  | Sprite 绑定 | — | `[SerializeField]` 在 Inspector 赋值，已通过 execute_code 自动完成 |
+  | sortingOrder | — | `-10`（tile 层在 Hero/Monster sprite 之后） |
+  | 新增方法 | `CreateMaterials()` / `MakeMat()` / `CellToMaterial()` | `ApplyCellVisual(SpriteRenderer, x, y, CellType)` |
+
+- **A 类测试结果**：
+  - compile: 零 Error，零 Warning（validate_script: standard）
+  - `ApplyCellVisual` 方法存在（反射验证）✓
+  - `RefreshCell` 方法签名不变（兼容性保持）✓
+  - `matSoil` 等旧字段已移除（反射验证）✓
+  - `spriteSoilSurface` / `spriteSoilDeep` 已通过 SerializedObject 赋值 ✓
+  - Scene `isDirty=true`（Sprite 赋值已标记）✓
+  - Console：仅 1 条 MCP WebSocket 断连 warning（与本次修改无关）
+
+- **调用工具**：
+  - `mcp__unity-mcp__script_apply_edits`（1 次，8 个 edit 批量应用）
+  - `mcp__unity-mcp__refresh_unity`（1 次）
+  - `mcp__unity-mcp__read_console`（2 次）
+  - `mcp__unity-mcp__validate_script`（1 次，standard 级别）
+  - `mcp__unity-mcp__execute_code`（3 次：Sprite 赋值 / 字段验证 / scene 状态确认）
+  - `mcp__unity-mcp__manage_scene`（1 次：get_active 确认 dirty）
+  - **未执行任何 git 操作**
+
+- **经验**：
+  - `SpriteRenderer` + `Sprite.Create(Texture2D.whiteTexture, ...)` 是"着色占位"的最简方案，无需单独创建 1×1 颜色贴图
+  - `script_apply_edits` 8 个 edit 一次调用成功，validate=standard 无问题；适合同文件内多方法批量改
+  - `SerializedObject.ApplyModifiedProperties()` + `SetDirty()` 在编辑器模式即可完成 Sprite 绑定，不需要进 Play Mode
+
+- **C 类（请手动验证）**：
+  - 在 Unity Inspector 中检查 GridManager GameObject 上的 GridRenderer 组件，确认 `Sprite Soil Surface` / `Sprite Soil Deep` 字段已显示对应 sprite 缩略图
+  - 手动进入 Play Mode 观察 32×18 地图：上半区 Soil 显示 `tile_soil_surface_00`（含碎石浅色），下半区显示 `tile_soil_deep_00`（深色底面）
+  - 点击格子挖开后，格子变暗色（Empty = ColorEmpty），确认 `RefreshCell` 正常工作
+  - 确认 Hero / Monster 角色层级在 tile 之上（sortingOrder > -10 才可见）
+
+- **⚠️ 请手动保存 Scene**：
+  - `GameScene.isDirty=true`，Sprite 赋值尚未持久化到 `.unity` 文件
+  - 请在 Unity 菜单 **File → Save（Ctrl+S）** 手动保存，或在 `GameScene` 验收完成后保存
+  - AI 不自动调用 `manage_scene(save)`（遵循 UNITY_MCP_RULES § 三-1）
+
+- **下一步**：
+  - 验收 TASK-030（C 类 Play Mode 测试）后，考虑类似方式接入 `hero_warrior_idle_00` / `monster_slime_idle_00` 到 HeroRenderer / MonsterRenderer
+  - 或讨论 TASK-029E（Prefab 自动化）路线
+
 *后续每个 Task 完成后在此追加记录。*

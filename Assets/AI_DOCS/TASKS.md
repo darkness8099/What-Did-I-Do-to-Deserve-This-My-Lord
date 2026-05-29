@@ -84,12 +84,14 @@
 
 ## 阶段 9：美术资源接入与目录规范
 
-- [ ] **TASK-029A** — 只读分析合作美术发来的资源包清单（项目外路径），输出"资源 vs 项目系统"映射表
+- [x] **TASK-029A** — 只读分析合作美术发来的资源包清单（项目外路径），输出"资源 vs 项目系统"映射表
 - [x] **TASK-029B** — 创建美术接入规则与命名规则文档（`ART_INTAKE_RULES.md` / `ART_NAMING_RULES.md` / `ART_INTAKE_LOG.md`）
-- [ ] **TASK-029C** — 在 `Assets/Art/` 下创建分类空目录骨架（含 `_Incoming/`），仅 `.gitkeep` 占位
-- [ ] **TASK-029D** — 选 1–2 张测试 sprite 走完整流程：进 `_Incoming/` → 命名 → 设 Import Setting → 移动到 `Art/Tiles/`
+- [x] **TASK-029C** — 在 `Assets/Art/` 下创建分类空目录骨架（含 `_Incoming/`），仅 `.gitkeep` 占位
+- [x] **TASK-029D** — 选 1–2 张测试 sprite 走完整流程：进 `_Incoming/` → 命名 → 设 Import Setting → 移动到 `Art/Tiles/`
+- [x] **TASK-029E-pre** — 全量导入剩余 4 张（入口 / 勇者 / 史莱姆 / Demon Lord），完成初始 Art 目录填充
 - [ ] **TASK-029E** — Prefab 自动化实验：用 1 个 Slime sprite 生成 `Slime.prefab`，让 `MonsterRenderer` 改为实例化模式
 - [ ] **TASK-029F** — UI 自动部署实验：用 1 张 victory panel 替换 `MVPResultUI` 的纯文字
+- [x] **TASK-030** — `GridRenderer` 接入 Soil sprite（`tile_soil_surface_00` / `tile_soil_deep_00`），替换 Soil 格纯色 Quad 渲染
 
 ---
 

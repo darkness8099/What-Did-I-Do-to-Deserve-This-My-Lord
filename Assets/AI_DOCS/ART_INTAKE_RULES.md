@@ -13,7 +13,7 @@
 ```
 Assets/
 ├── Art/                       ← 正式资源（已确认导入、命名规范、Import Setting 已调）
-│   ├── Tiles/                 ← Soil / Empty / Wall / Entrance / DemonLordRoom
+│   ├── Tiles/                 ← Soil 变体 / Entrance / DemonLordRoom（Empty 格无 sprite）
 │   ├── Characters/
 │   │   ├── Heroes/            ← 勇者（含未来多兵种）
 │   │   └── Monsters/          ← Slime 及未来魔物
@@ -25,15 +25,14 @@ Assets/
 │   ├── Backgrounds/           ← 场外背景
 │   ├── Props/                 ← 装饰物（宝箱、火把等，后续）
 │   └── FX/                    ← 粒子贴图、Sprite Sheet（后续）
-└── Art/_Incoming/             ← 临时暂存区（合作美术新发来的原始包，未审核）
-    └── YYYY-MM-DD_<batch>/    ← 按批次分日期，避免覆盖
+└── Art/_Incoming/             ← 临时暂存区（直接平铺，已英文命名，未审核）
 ```
 
 ### 设计原则
 
 - **`Art/`**：仅存放已审核、已命名、已设 Import Setting 的正式资源。
-- **`Art/_Incoming/`**：仅供人类挑选的临时区，**不允许**被运行时代码（`GridRenderer` / `HeroRenderer` / `MonsterRenderer` 等）直接引用。
-- **批次命名**：`YYYY-MM-DD_<batch>` 保证可追溯到哪一批美术什么时候交付。
+- **`Art/_Incoming/`**：仅供审核的临时区，**直接平铺文件，不按批次建子目录**。批次追踪靠 `ART_INTAKE_LOG.md`，不靠目录结构，避免子目录层级混乱。
+- **`_Incoming/` 内的文件已使用规范英文命名**（进入项目即改名，不保留中文原名）。审核通过后直接 move 到 `Art/<category>/`，不需要二次改名。
 - **不创建**：`Animations/` / `Materials/` / `Shaders/` 子目录在真正需要时再生，避免空目录污染。
 
 ---
@@ -45,42 +44,51 @@ Assets/
 ```
 [美术发送]
   ↓
-[D:\Game Art Drops\MyLord\YYYY-MM-DD_<batch>\]   ← Unity 外暂存（保留原始 PSD/AI/源文件）
-  ↓ 人类挑选 PNG/导出文件
-[Assets/Art/_Incoming/YYYY-MM-DD_<batch>/]       ← Unity 内审核区（仅扁平 PNG/导出件）
-  ↓ AI 协助审核 + 应用 Import Setting + 命名规范
-[Assets/Art/<category>/]                          ← 正式资源
+[D:\Game Developer Tools\Game Art Drops\MyLord\<原始包名>\]
+                              ← Unity 外暂存（保留原始 PSD/AI/源文件，不受命名规则约束）
+  ↓ 人类挑选 PNG/导出文件，AI 协助英文命名
+[Assets/Art/_Incoming/]      ← Unity 内审核区（扁平 PNG，已规范英文命名）
+  ↓ AI 协助应用 Import Setting，人类确认
+[Assets/Art/<category>/]     ← 正式资源（move，.meta 随行）
+  ↓
+[ART_INTAKE_LOG.md]          ← 追加一行批次记录
 ```
 
 ### 为什么两段式
 
 | 方案 | 优势 | 劣势 |
 |---|---|---|
-| **A. 项目外**：`D:\Game Art Drops\MyLord\YYYY-MM-DD\` | 1. Unity 完全不感知，不会自动导入<br>2. 原始包可保留 PSD/AI 等大文件<br>3. 不污染 git | 1. 美术每次要走"手动复制进 Unity"流程<br>2. 离开仓库后版本信息丢失 |
-| **B. 项目内 `_Incoming`** | 1. Unity 内一站式预览<br>2. 跟 git 走，可回滚 | 1. **任何放入都会被 Unity 自动 import** → 立即生成 .meta<br>2. PSD/巨大原始包污染仓库 |
+| **A. 项目外暂存** | 1. Unity 完全不感知，不会自动导入<br>2. 原始包可保留 PSD/AI 等大文件<br>3. 不污染 git | 需要一步手动/AI 辅助复制+改名 |
+| **B. 项目内 `_Incoming`** | 1. Unity 内一站式预览<br>2. 跟 git 走，可回滚 | 任何放入都会被 Unity 自动 import → 立即生成 .meta |
 
-**结论**：两段式取双方优点 —— 项目外保留全部源文件，项目内只放可直接使用的导出件。
+**结论**：项目外保留全部源文件；`_Incoming/` 只放已英文命名的导出件，让 import 行为可控。
 
 ### 关键约束
 
-- **项目外暂存（A 段）**：路径固定为 `D:\Game Art Drops\MyLord\YYYY-MM-DD_<batch>\`。本目录不归 Unity 管，AI **不要自动创建**，由人类按需建立。
-- **项目内审核（B 段）**：**只放扁平 PNG / 导出件**，禁止放 PSD/AI 等原始工程文件。
-- **不允许**：直接把美术发来的整包 zip / 文件夹一次性拖入 `Assets/`，必须先在 A 段挑选。
+- **项目外暂存路径**：`D:\Game Developer Tools\Game Art Drops\MyLord\`。AI **不要自动创建**，由人类/美术自行维护。
+- **`_Incoming/` 直接平铺**：不按批次建子目录，批次信息记录到 `ART_INTAKE_LOG.md`，靠日志追踪不靠目录结构。
+- **进入 Unity 即英文命名**：复制到 `_Incoming/` 同时完成改名，文件名符合 `ART_NAMING_RULES.md`。
+- **只放扁平 PNG / 导出件**：禁止放 PSD/AI 等原始工程文件。
 
 ---
 
-## 三、批次接入流程（每批必走）
+## 三、接入流程（每批必走）
 
 ```
-1. 项目外接收原始包，落到 D:\Game Art Drops\MyLord\YYYY-MM-DD_<batch>\
-2. 人类挑选 PNG/导出文件
-3. 创建 Assets/Art/_Incoming/YYYY-MM-DD_<batch>/，复制挑选后的文件
-4. AI 协助：
-   - 按 ART_NAMING_RULES 重命名（仅在移动到正式 Art/ 时执行，不改 _Incoming/ 内原名）
-   - 应用 Import Setting（Texture Type / Filter Mode / Pixel Per Unit / Compression）
-   - 移动到 Assets/Art/<category>/
-5. 人类最终确认
-6. 在 ART_INTAKE_LOG.md 追加一行记录（日期 / 批次 / 件数 / 处理结果）
+1. 项目外：人类从美术交付包中挑选 PNG/导出文件
+2. AI 协助：按 ART_NAMING_RULES 确定英文文件名
+3. 复制到 Assets/Art/_Incoming/（直接平铺，使用英文命名，不建子目录）
+   → Unity 自动 import，生成 .meta，GUID 锁定
+4. AI 协助应用 Import Setting（via manage_asset(modify)）：
+   - Texture Type: Sprite (2D and UI)
+   - Filter Mode: Point (no filter)
+   - Compression: None
+   - Pixels Per Unit: 48（本项目当前规格）
+   - Sprite Mode: Single（单帧）/ Multiple（Sprite Sheet 时）
+   - Generate Mip Maps: 关闭
+5. 人类在 Unity Inspector 确认 Import Setting 正确
+6. AI 将文件 move 到 Assets/Art/<category>/（manage_asset(move)，.meta 随行）
+7. 在 ART_INTAKE_LOG.md 追加一行记录
 ```
 
 每一步都需要人类**明确**授权 AI 才能执行，**不得**跳过确认。
@@ -93,7 +101,7 @@ Assets/
 
 | 资源类型 | Texture Type | Filter Mode | Compression | Pixel Per Unit |
 |---|---|---|---|---|
-| 像素风 Tile / Sprite | Sprite (2D and UI) | **Point (no filter)** | None | 与美术沟通（常用 16 / 32 / 64） |
+| 像素风 Tile / Sprite | Sprite (2D and UI) | **Point (no filter)** | None | **48**（本项目当前规格：48×48 px，1格=1 Unity unit） |
 | 高分辨率插画 / UI | Sprite (2D and UI) | Bilinear | Normal Quality | 100（Unity 默认） |
 | 字体（位图） | Sprite (2D and UI) | Point | None | 按设计 |
 | 背景大图 | Sprite (2D and UI) | Bilinear | Normal Quality | 100 |

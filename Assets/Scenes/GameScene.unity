@@ -190,6 +190,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b63b0346279ddf44683fa859f209f0dd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  spriteSoilSurface: {fileID: 21300000, guid: 876fa777466cc3542a356a753012def6, type: 3}
+  spriteSoilDeep: {fileID: 21300000, guid: 461b2a56e5967a746a0d9325f975123b, type: 3}
 --- !u!114 &1519096722
 MonoBehaviour:
   m_ObjectHideFlags: 0
