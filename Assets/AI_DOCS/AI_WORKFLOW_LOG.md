@@ -2577,3 +2577,372 @@ GridData → GridManager → GridRenderer → InputHandler（挖掘）
   - 未进入 Play Mode
   - 未执行 git
   - 未直接编辑 Scene / Prefab YAML
+
+---
+
+### 2026-06-01 TASK-046A — Vegetation 提升为最高背景装饰层
+
+- **任务目标**：
+  - 将 Vegetation 从与 Props 同层，提升为当前背景装饰体系中的最高层
+  - 保持其仍低于 Gameplay 层，不遮盖土块 / 勇者 / 怪物 / 魔王
+
+- **实际完成内容**：
+  - 修改 `Assets/Scripts/DecorationPlacementData.cs`
+    - 新增 `DecorationSortingLayer.BG_TopDeco = -30`
+    - `DecorationCategory.Vegetation` 的默认层从 `BG_FrontDeco(-40)` 提升到 `BG_TopDeco(-30)`
+  - 修改 `Assets/Scripts/BackgroundLayerRenderer.cs`
+    - 新增 `BG_TopDeco` 层 root 的创建 / 清理 / sorting 映射
+  - 修改 `Assets/AI_DOCS/SURFACE_DECORATION_RULES.md`
+    - 背景层级表同步为：
+      - `BG_Base = -100`
+      - `BG_BackDeco = -80`
+      - `BG_MidDeco = -60`
+      - `BG_FrontDeco = -40`
+      - `BG_TopDeco = -30`
+      - `Gameplay >= -10`
+
+- **简短规则结论**：
+  - 当前背景层级规则现在是：
+    - `BG_Base=-100`
+    - `BG_BackDeco=-80`
+    - `BG_MidDeco=-60`
+    - `BG_FrontDeco=-40`
+    - `BG_TopDeco=-30`
+    - `Gameplay>=-10`
+  - SurfaceObject / Building / Entrance 在 `BG_MidDeco`
+  - Prop 在 `BG_FrontDeco`
+  - **Vegetation 现在单独在最高背景装饰层 `BG_TopDeco`**
+
+- **边界说明**：
+  - 未进入 Play Mode
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML
+
+---
+
+### 2026-06-01 TASK-046B — 地表背景草稿生成规则加密
+
+- **任务目标**：
+  - 修正当前地表背景草稿“可生成但偏空、主体孤立”的问题
+  - 保持系统仍是 Editor 草稿生成工具，而不是运行时随机背景系统
+  - 只做小范围规则和参数修正，不碰地图核心逻辑
+
+- **实际完成内容**：
+  - 重写 `Assets/AI_DOCS/SURFACE_DECORATION_RULES.md`
+    - 明确系统定位为 **Editor 草稿生成工具**
+    - 明确地表素材仍按 **10 格高**制作
+    - 明确当前主要可见布置区应理解为 **地表线上方约 5~7 格**
+    - 明确天空 / 远山是缓冲，不是主要布置密度区
+    - 明确当前生成结果仅作草稿，后续由用户人工微调并决定是否保存
+    - 新增当前草稿生成目标：
+      - Zone C：`8~12` 个 Props / Vegetation
+      - 全图 sprinkle：`25~40` 个 Props / Vegetation
+      - 主体附属装饰：每个中大型主体左右 `1~3` 格补 `2~5` 个小装饰
+      - 空白补足：连续约 `4` 格无装饰补小装饰；连续约 `8` 格无中大型主体补一个中型主体或建筑
+  - 修改 `Assets/Scripts/SurfaceDecorationSpawner.cs`
+    - `zoneCPropsAroundEntranceMin/Max: 3~6 -> 8~12`
+    - `sprinkleMin/Max: 10~20 -> 25~40`
+    - 新增 attached decoration 参数：
+      - `attachedDecorMin/Max = 2~5`
+      - `attachedDecorOffsetMin/Max = 1~3`
+    - Entrance / SurfaceObject / Building 生成后自动触发附属小装饰补摆
+    - 新增 `FillSparseSurface(...)`
+      - 连续约 4 格无装饰时补 1 个小装饰
+      - 连续约 8 格无中大型主体时补 1 个主体或建筑（遵守 Zone 权重）
+    - 仍保留“同层 footprint 防重叠、跨层允许叠放”的原约束
+  - 修改 `Assets/AI_DOCS/TASKS.md`
+    - 追加 `TASK-046B`
+
+- **系统定位确认**：
+  - 当前仍是 **Editor 草稿工具**
+  - 不扩展为运行时 Rogue-like 随机背景
+  - 用户仍保留最终人工微调与保存决定权
+
+- **边界说明**：
+  - 未进入 Play Mode
+  - 未执行 git
+  - 未修改地图核心 / 土块逻辑
+  - 未直接编辑 Scene / Prefab YAML
+
+---
+
+### 2026-06-01 TASK-050 — BackgroundLayerRoot 编辑器辅助化
+
+- **任务目标**：
+  - 修正当前背景系统误入运行时自动生成的问题
+  - 将 `BackgroundLayerRoot` 上的 `BackgroundLayerRenderer` 明确收口为 **编辑器辅助工具**
+  - 在 Inspector 上提供一套可直接使用的草稿背景工作流按钮
+
+- **实际完成内容**：
+  - 修改 `Assets/Scripts/BackgroundLayerRenderer.cs`
+    - 移除 `rebuildOnStart` 与 `Start()` 自动生成入口
+    - 保留并整理手动调用接口：
+      - `GenerateRandomSeed()`
+      - `GenerateDraftInEditor()`
+      - `ClearGeneratedBackground()`
+      - `SaveCurrentBackgroundAsPrefab()`
+    - 新增 editor dirty 标记，便于在 Edit Mode 下追踪草稿变化
+  - 新增 `Assets/Editor/BackgroundLayerRendererEditor.cs`
+    - 为 `BackgroundLayerRenderer` 提供自定义 Inspector
+    - 在非 Play Mode 下提供按钮：
+      - `Randomize Seed`
+      - `Generate Draft In Editor`
+      - `Clear Generated Background`
+      - `Save Current Background As Prefab`
+  - 修改 `Assets/AI_DOCS/SURFACE_DECORATION_RULES.md`
+    - 明确当前流程为“编辑器草稿生成 + 人工微调 + 固化为 Prefab”
+    - 明确不再依赖运行时自动生成
+  - 修改 `Assets/AI_DOCS/TASKS.md`
+    - 将 `TASK-050` 落档为当前已完成的编辑器辅助化任务
+
+- **系统定位确认**：
+  - `BackgroundLayerRoot` 现在是 **背景制作编辑器辅助**
+  - 不再默认在运行时 / Start 自动生成背景
+  - 后续可将人工确认后的背景保存为固定 Prefab 复用
+
+- **验证与边界**：
+  - 未进入 Play Mode
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML
+  - 未改地图核心 / 土块逻辑
+
+---
+
+### 2026-06-01 TASK-050A — 背景装饰草稿生成基线调整
+
+- **任务目标**：
+  - 根据编辑器草稿验证结果，将背景装饰从原本贴近第 10 格地表/地底交界的位置上移
+  - 当前大背景已经自带地表线，装饰更适合在第 9 格附近生成，方便用户手动微调
+
+- **实际完成内容**：
+  - 修改 `Assets/Scripts/BackgroundLayerRenderer.cs`
+    - 新增 `decorationBaselineOffsetCells`
+    - 默认值设为 `1`
+    - 装饰对象 Y 坐标从 `height - surfaceHeight` 改为通过 `GetDecorationBaselineY()` 计算
+    - 当前等价于相对地表背景底线向上 1 格生成
+  - 修改 `Assets/AI_DOCS/SURFACE_DECORATION_RULES.md`
+    - 新增“装饰生成高度”说明
+    - 明确该偏移只影响背景草稿装饰垂直摆放，不修改地图核心 / 土块 / 玩法坐标
+  - 修改 `Assets/AI_DOCS/TASKS.md`
+    - 追加 `TASK-050A`
+
+- **边界说明**：
+  - 未进入 Play Mode
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML
+  - 未修改地图核心 / 土块生成逻辑
+
+---
+
+### 2026-06-01 TASK-050B — 背景 Prefab 保存命名与目录整理
+
+- **任务目标**：
+  - 修正背景草稿保存总是覆盖同一个默认 Prefab 的问题
+  - 为后续最多约 10 个成品背景图建立清晰、可管理的编号命名
+
+- **实际完成内容**：
+  - 修改 `Assets/Scripts/BackgroundLayerRenderer.cs`
+    - `savedPrefabPath` 替换为：
+      - `savedPrefabFolder = "Assets/Prefabs/Backgrounds"`
+      - `savedPrefabNamePrefix = "PF_Background_Surface"`
+      - `savedPrefabMaxCount = 10`
+    - 保存时自动确保目标目录存在
+    - 保存时自动寻找第一个未占用编号：
+      - `PF_Background_Surface_01.prefab`
+      - ...
+      - `PF_Background_Surface_10.prefab`
+    - 若 1~10 均已存在，则停止保存并输出 Warning，避免误覆盖
+  - 修改 `Assets/AI_DOCS/SURFACE_DECORATION_RULES.md`
+    - 增加背景 Prefab 保存目录与编号命名规则
+  - 修改 `Assets/AI_DOCS/TASKS.md`
+    - 追加 `TASK-050B`
+
+- **边界说明**：
+  - 未进入 Play Mode
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML
+  - 未修改地图核心 / 土块生成逻辑
+
+---
+
+### 2026-06-01 TASK-050C — 游戏模式背景应用
+
+- **任务目标**：
+  - 将用户已保存的背景 Prefab 应用到游戏模式测试中
+  - 游戏开始时只随机选择已有背景 Prefab，不再运行时生成草稿
+  - 如果没有已保存背景 Prefab，则明确打印 Error，便于排查
+
+- **实际完成内容**：
+  - 修改 `Assets/Scripts/BackgroundLayerRenderer.cs`
+    - 新增 `loadRandomSavedPrefabOnStart = true`
+    - 新增 `Start()`，默认调用 `LoadRandomSavedBackgroundForGameplay()`
+    - 新增 `LoadRandomSavedBackgroundForGameplay()`
+      - 清理当前草稿层
+      - 从 `Assets/Prefabs/Backgrounds/PF_Background_Surface_01.prefab` ~ `10` 中随机选择一个存在的 Prefab
+      - 实例化到 `BackgroundLayerRoot` 下
+      - 没有找到任何 Prefab 时输出 `LogError`
+    - 新增 `PickRandomSavedBackgroundPrefab()`
+  - 修改 `Assets/AI_DOCS/SURFACE_DECORATION_RULES.md`
+    - 增加“游戏模式应用规则”
+    - 明确游戏模式不重新生成草稿，只使用已保存 Prefab
+  - 修改 `Assets/AI_DOCS/TASKS.md`
+    - 追加 `TASK-050C`
+
+- **边界说明**：
+  - 未进入 Play Mode，视觉结果由用户手动审查
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML
+  - 未修改地图核心 / 土块生成逻辑
+
+---
+
+### 2026-06-01 TASK-051 — 入口连接点重定义
+
+- **任务目标**：
+  - 入口不再使用旧的地下表层下方位置
+  - 当前入口连接点固定为地图中间列、从上往下第 10 格
+  - 该格属于地下世界入口连接的一部分，视觉上应为黑色空洞，而不是旧测试绿色入口格
+
+- **实际完成内容**：
+  - 修改 `Assets/Scripts/LevelConfig.cs`
+    - `entranceRowsBelowSurface` 替换为 `entranceRowFromTop`
+    - 默认值设为 `10`
+    - `ResolveEntranceY()` 改为按“从上往下第 N 格”计算
+    - 当前 70x50 默认入口坐标为 `(35,40)`
+  - 修改 `Assets/Scripts/GridRenderer.cs`
+    - 移除旧 `spriteEntrance` 字段使用
+    - `CellType.Entrance` 现在按黑色空洞渲染
+    - 修复旧入口素材删除后 fallback 为绿色测试格的问题
+  - 修改 `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
+    - 补充入口连接点新规则
+    - 记录未来勇者会从地表走向背景入口美术，再进入地下入口连接点
+  - 修改 `Assets/AI_DOCS/TASKS.md`
+    - 追加 `TASK-051`
+
+- **边界说明**：
+  - 未进入 Play Mode
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML
+  - 未实现地表勇者行走到入口美术的新流程；该流程留给后续入口系统重做任务
+
+---
+
+### 2026-06-01 TASK-052 — Scripts 目录分类整理
+
+- **任务目标**：
+  - 解释 `Assets/Editor/BackgroundLayerRendererEditor.cs` 的用途
+  - 将已经变多的 `Assets/Scripts` 根目录脚本按系统分类整理
+  - 保持脚本 GUID 与场景组件引用稳定，不修改业务逻辑
+
+- **说明**：
+  - `BackgroundLayerRendererEditor` 是 `BackgroundLayerRenderer` 的自定义 Inspector，只负责在 Unity Editor 内显示按钮：
+    - `Randomize Seed`
+    - `Generate Draft In Editor`
+    - `Clear Generated Background`
+    - `Save Current Background As Prefab`
+  - 该脚本必须位于 `Assets/Editor` 或其子目录内，使其只进入 Editor 编译程序集，不进入运行时游戏代码。
+
+- **实际完成内容**：
+  - 通过 `AssetDatabase.MoveAsset` 移动脚本，保留 `.meta` / GUID
+  - 新目录结构：
+    - `Assets/Scripts/Core`
+    - `Assets/Scripts/Grid`
+    - `Assets/Scripts/Input`
+    - `Assets/Scripts/Hero`
+    - `Assets/Scripts/DemonLord`
+    - `Assets/Scripts/Monsters`
+    - `Assets/Scripts/Combat`
+    - `Assets/Scripts/Ecology`
+    - `Assets/Scripts/Background`
+    - `Assets/Scripts/UI`
+    - `Assets/Editor/Background`
+  - 未修改脚本内容，仅移动资产路径
+
+- **验证结果**：
+  - `refresh_unity` 编译刷新通过
+  - Console 无脚本 Error
+  - `GridManager` / `BackgroundLayerRenderer` / `HeroMover` 组件仍可在场景中找到
+
+- **边界说明**：
+  - 未进入 Play Mode
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML
+  - 未修改 gameplay 逻辑
+
+---
+
+### 2026-06-01 TASK-053 — 土块养分外观规则接入
+
+- **任务目标**：
+  - 将 Soil 主题 0-15 图改为由 `TileAttributeData.Nutrient` 驱动
+  - 保持不同外观土块本质上仍然都是 `CellType.Soil`，不引入独立 Tile 类 / Prefab 继承体系
+  - 修正“外观随机但和养分无关”的临时表现逻辑
+
+- **实际完成内容**：
+  - 修改 `Assets/Scripts/Grid/TileAttributeData.cs`
+    - 新增 `MaxVisualIndex = 15`
+    - 新增 `GetNutrientVisualIndex()`
+    - 新增 `GetNutrientTier()`
+    - 映射规则：
+      - `0 -> 0`
+      - `1-10 -> 1-5`
+      - `11-20 -> 6-10`
+      - `21+ -> 11-15`，继续增长时外观最高停在 `15`
+    - `0-5` 视为 1 级，`6-10` 视为 2 级，`11-15` 视为 3 级
+  - 修改 `Assets/Scripts/Core/LevelConfig.cs`
+    - 新增初始 Soil 养分测试分布参数
+    - 初始化阶段为所有 Soil 写入可重复的 `Nutrient` 值
+    - 初始 visual index `0-5` 的 Soil 默认带 `TileElementType.Slime`
+  - 修改 `Assets/Scripts/Grid/GridRenderer.cs`
+    - Soil sprite index 改为读取 `gridManager.GetTileAttribute(x,y).GetNutrientVisualIndex()`
+    - 颜色主题仍保留按深度分层，主题内第几张图由养分决定
+  - 修改 `Assets/Scripts/Grid/DigActionHandler.cs`
+    - 资源扩散后刷新周围 3 格半径外观，使养分变化能反映到土块 sprite
+  - 修改 `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
+    - 增加土块养分外观规则说明
+  - 修改 `Assets/AI_DOCS/TASKS.md`
+    - 追加 `TASK-053`
+
+- **规则确认**：
+  - 不同外观土块不是不同类型；都仍然是 `CellType.Soil`
+  - 是否可挖仍由 `GridManager.IsDiggable` 决定：目标必须是 Soil，且四邻至少有一个 `Empty` / `Entrance`
+  - 如果某块看起来是土但挖不动，优先检查四邻是否连通，而不是素材类型
+
+- **边界说明**：
+  - 未进入 Play Mode
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML
+  - 未实现 2 / 3 级魔物，只接入土块外观和 1 级 Slime 生成倾向
+
+---
+
+### 2026-06-01 TASK-054 — 初始养分生成规则固化
+
+- **任务目标**：
+  - 修正 TASK-053 后“所有 Soil 都带可重复测试养分分布”的设计风险
+  - 明确正式初始地图不应平均铺养分，也不应在早期天然大量出现 Lv2 / Lv3 高阶养分
+  - 将初始资源方向固化为“低级团簇为主，高级养分主要由生态成长产生”
+
+- **实际完成内容**：
+  - 修改 `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
+    - 新增“初始养分生成规则（TASK-054）”
+    - 明确地下 Soil 默认 `Nutrient = 0`
+    - 明确初始养分使用局部团簇：`center` / `radius` / `power` / `falloff`
+    - 明确 Stage 1 只允许 Lv1 初始养分，Stage 2 才允许极少量 Lv2 种子点，Stage 3+ 仍克制 Lv3 初始出现
+    - 明确 `tile_00` / `tile_01~05` / `tile_06~10` / `tile_11~15` 的阶段语义
+    - 将当前 `LevelConfig.ApplyInitialSoilAttributes()` 的全图测试分布标记为后续替换对象
+  - 修改 `Assets/AI_DOCS/TASKS.md`
+    - 追加并完成 `TASK-054`
+    - 追加后续 `TASK-055` / `TASK-056` / `TASK-057`
+
+- **后续实现方向**：
+  - `TASK-055`：新增 `StageNutrientProfile` / `NutrientClusterSettings` 数据结构
+  - `TASK-056`：用 `GenerateInitialNutrients()` 替换当前全图测试分布
+  - `TASK-057`：生态系统动态改变 Soil 养分后刷新外观
+
+- **边界说明**：
+  - 未修改代码
+  - 未修改场景
+  - 未进入 Play Mode
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML

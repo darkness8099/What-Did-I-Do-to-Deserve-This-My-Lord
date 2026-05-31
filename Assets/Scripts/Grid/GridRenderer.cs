@@ -6,12 +6,8 @@ public class GridRenderer : MonoBehaviour
     [SerializeField] private Sprite[] soilDarkBlueSprites;
     [SerializeField] private Sprite[] soilDarkGreenSprites;
     [SerializeField] private Sprite[] soilDarkPurpleRedSprites;
-    [SerializeField] private Sprite spriteEntrance;
-
-    private const int SoilBandHeight = 8;
 
     private static readonly Color ColorEmpty         = new Color(0.10f, 0.10f, 0.10f);
-    private static readonly Color ColorEntrance      = new Color(0.20f, 0.80f, 0.20f);
     private static readonly Color ColorSoilFallback  = new Color(0.55f, 0.35f, 0.15f);
 
     private GridManager    gridManager;
@@ -107,8 +103,8 @@ private void ApplyCellVisual(SpriteRenderer sr, int x, int y, CellType type)
                 sr.color  = ColorEmpty;
                 break;
             case CellType.Entrance:
-                sr.sprite = spriteEntrance != null ? spriteEntrance : _whitePlaceholder;
-                sr.color  = spriteEntrance != null ? Color.white : ColorEntrance;
+                sr.sprite = _whitePlaceholder;
+                sr.color  = ColorEmpty;
                 break;
             default:
                 sr.sprite = _whitePlaceholder;
@@ -124,13 +120,22 @@ private void ApplyCellVisual(SpriteRenderer sr, int x, int y, CellType type)
         if (undergroundRowFromTop <= 0)
             return GetFallbackSoilSprite();
 
-        int bandIndex = Mathf.Max(0, (undergroundRowFromTop - 1) / SoilBandHeight);
+        int bandIndex = GetSoilColorBandIndex(undergroundRowFromTop);
         Sprite[] bandSprites = GetSoilPaletteForBand(bandIndex);
         if (bandSprites == null || bandSprites.Length == 0)
             return GetFallbackSoilSprite();
 
-        int spriteIndex = Mathf.Abs((x * 17) + (y * 31)) % bandSprites.Length;
+        TileAttributeData attribute = gridManager.GetTileAttribute(x, y);
+        int spriteIndex = Mathf.Clamp(attribute.GetNutrientVisualIndex(), 0, bandSprites.Length - 1);
         return bandSprites[spriteIndex];
+    }
+
+    private int GetSoilColorBandIndex(int undergroundRowFromTop)
+    {
+        if (undergroundRowFromTop <= 8) return 0;
+        if (undergroundRowFromTop <= 16) return 1;
+        if (undergroundRowFromTop <= 24) return 2;
+        return 3;
     }
 
     private int GetRowFromTop(int y)

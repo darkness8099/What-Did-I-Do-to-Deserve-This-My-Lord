@@ -10,12 +10,17 @@ public class LevelConfig : MonoBehaviour
 
     [Header("Entrance Room")]
     [SerializeField] private int entranceColumn = AutoCenterColumn;
-    [SerializeField] private int entranceRowsBelowSurface = 1;
+    [SerializeField] private int entranceRowFromTop = 10;
     [SerializeField] private int openCellsBelowEntrance = 3;
     [SerializeField] private int demonLordCellsBelowEntrance = 3;
 
     [Header("Surface Region")]
     [SerializeField] private int surfaceBackgroundRows = 10;
+
+    [Header("Initial Soil Nutrients")]
+    [SerializeField] private int initialSoilNutrientMin = 0;
+    [SerializeField] private int initialSoilNutrientMax = 28;
+    [SerializeField] private int initialSlimeMaxVisualIndex = 5;
 
     [Header("Hero Flow")]
     [SerializeField] private float heroSpawnDelaySeconds = 10f;
@@ -58,6 +63,8 @@ public class LevelConfig : MonoBehaviour
             for (int y = Mathf.Max(surfaceY + 1, 0); y < gridData.Height; y++)
                 gridData.SetCell(x, y, CellType.Empty);
 
+        ApplyInitialSoilAttributes(gridData);
+
         gridData.SetCell(entrance.x, entrance.y, CellType.Entrance);
 
         int shaftDepth = Mathf.Max(openCellsBelowEntrance, demonLordCellsBelowEntrance);
@@ -95,9 +102,37 @@ public class LevelConfig : MonoBehaviour
 
     private int ResolveEntranceY()
     {
-        return Mathf.Clamp(
-            UndergroundSurfaceY - Mathf.Max(1, entranceRowsBelowSurface),
-            0,
-            Mathf.Max(0, UndergroundSurfaceY - 1));
+        int rowFromTop = Mathf.Max(1, entranceRowFromTop);
+        return Mathf.Clamp(height - rowFromTop, 0, height - 1);
+    }
+
+    private void ApplyInitialSoilAttributes(GridData gridData)
+    {
+        int min = Mathf.Max(0, initialSoilNutrientMin);
+        int max = Mathf.Max(min, initialSoilNutrientMax);
+
+        for (int x = 0; x < gridData.Width; x++)
+        {
+            for (int y = 0; y < gridData.Height; y++)
+            {
+                if (gridData.GetCell(x, y) != CellType.Soil) continue;
+
+                int nutrient = CalculateInitialNutrient(x, y, min, max);
+                int visualIndex = TileAttributeData.GetNutrientVisualIndex(nutrient);
+                TileElementType element = visualIndex <= initialSlimeMaxVisualIndex
+                    ? TileElementType.Slime
+                    : TileElementType.None;
+
+                gridData.SetTileAttribute(x, y, new TileAttributeData(nutrient, 0, element));
+            }
+        }
+    }
+
+    private int CalculateInitialNutrient(int x, int y, int min, int max)
+    {
+        if (max <= min) return min;
+
+        int hash = Mathf.Abs((x * 73) ^ (y * 193) ^ (width * 17) ^ (height * 31));
+        return min + (hash % (max - min + 1));
     }
 }

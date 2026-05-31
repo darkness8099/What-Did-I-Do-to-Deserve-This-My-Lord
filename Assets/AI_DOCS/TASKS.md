@@ -115,7 +115,18 @@
 - [x] **TASK-049** — Soil 主题集接入：`GridRenderer` 按 grid 位置 / 主题 / 随机选用 4 色 × 16 张 `tile_soil_<color>_<index>`
 - [x] **TASK-049A** — 旧测试土块清理：删除 `tile_soil_surface_00` / `tile_soil_deep_00` 及其测试 prefab，默认土块生成完全切换到新主题集
 - [x] **TASK-049B** — 解除地下表层（第 11 行）不可点击限制，顶部 10 行背景区之外恢复统一四邻挖掘规则
-- [ ] **TASK-050** — 草稿持久化（可选）：草稿对象组烘焙为 `PF_Surface_Decoration_<level>.prefab` 或场景节点
+- [x] **TASK-046B** — 地表背景草稿生成规则加密：提高 Props / Vegetation 数量，引入主体附属装饰与空白补足，明确 10 格制作 / 5~7 格主要可见 / Editor 草稿定位
+- [x] **TASK-050** — `BackgroundLayerRoot` 编辑器辅助化：停止运行时自动生成；在 `BackgroundLayerRenderer` Inspector 上提供随机种子、编辑器生成、清空当前草稿、保存当前背景为 Prefab 的按钮工作流
+- [x] **TASK-050A** — 背景装饰草稿生成基线调整：`BackgroundLayerRenderer` 新增可调 `decorationBaselineOffsetCells`，默认向上 1 格，使装饰从第 9 格附近生成，便于基于大背景地表人工微调
+- [x] **TASK-050B** — 背景 Prefab 保存命名与目录整理：保存目录改为 `Assets/Prefabs/Backgrounds`，自动生成 `PF_Background_Surface_01` ~ `10` 的未占用编号，避免反复覆盖默认文件
+- [x] **TASK-050C** — 游戏模式背景应用：`BackgroundLayerRenderer` 在 Start 时从已保存的 `PF_Background_Surface_01` ~ `10` 中随机选择一个背景 Prefab 实例化；无已保存背景时打印 Error；不再运行时生成草稿
+- [x] **TASK-051** — 入口连接点重定义：入口固定为地图中间列、从上往下第 10 格，作为地下世界入口连接空洞；`GridRenderer` 不再显示旧绿色测试入口，Entrance 格按黑色空洞渲染
+- [x] **TASK-052** — Scripts 目录分类整理：通过 Unity AssetDatabase 移动脚本到 Core / Grid / Input / Hero / DemonLord / Monsters / Combat / Ecology / Background / UI；Editor 自定义 Inspector 移至 `Assets/Editor/Background`
+- [x] **TASK-053** — 土块养分外观规则接入：`TileAttributeData.Nutrient` 映射到 Soil 主题 0-15 图；0 / 1-10 / 11-20 / 21+ 分段决定 1-3 级外观；所有外观仍统一为可挖 `CellType.Soil`
+- [x] **TASK-054** — 初始养分生成规则固化：规定地下 Soil 默认 0 养分，初始养分以 Lv1 局部团簇为主，Lv2 仅中后期少量种子点，Lv3 主要由生态循环成长产生；当前全图测试养分分布标记为后续替换对象
+- [ ] **TASK-055** — 新增 `StageNutrientProfile` / `NutrientClusterSettings` 最小数据结构，用于表达关卡阶段、团簇中心、半径、强度、衰减与 `maxInitialNutrient`
+- [ ] **TASK-056** — 将 `LevelConfig.ApplyInitialSoilAttributes()` 当前全图测试养分分布替换为 `GenerateInitialNutrients()` 团簇式初始化，保证 Stage 1 主要只生成 `tile_00` ~ `tile_05`
+- [ ] **TASK-057** — 接入生态系统动态改变 Soil 养分后的外观刷新：魔物繁殖、死亡回流、捕食溢出、生命周期转化等改变资源时刷新对应土块 sprite
 
 ---
 

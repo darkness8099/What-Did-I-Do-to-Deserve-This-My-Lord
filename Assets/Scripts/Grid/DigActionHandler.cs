@@ -66,7 +66,10 @@ public class DigActionHandler : MonoBehaviour
 
         // Leftover resources after spawn (or all resources if no monster spawned) scatter to surrounding Soil
         if (attr.HasResource())
+        {
             ResourceFlow.ScatterDigLeftoverResources(new Vector2Int(x, y), attr.Nutrient, attr.Magic, gridManager, $"dig({x},{y})");
+            RefreshNearbyCells(x, y, 3);
+        }
     }
 
     private MonsterArchetype ResolveArchetypeForElement(TileElementType element)
@@ -76,5 +79,13 @@ public class DigActionHandler : MonoBehaviour
             case TileElementType.Slime: return MonsterArchetype.Slime;
             default: return null;
         }
+    }
+
+    private void RefreshNearbyCells(int centerX, int centerY, int radius)
+    {
+        for (int x = centerX - radius; x <= centerX + radius; x++)
+            for (int y = centerY - radius; y <= centerY + radius; y++)
+                if (gridManager.IsInside(x, y))
+                    gridRenderer.RefreshCell(x, y);
     }
 }

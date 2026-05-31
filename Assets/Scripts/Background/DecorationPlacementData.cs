@@ -20,6 +20,7 @@ public static class DecorationSortingLayer
     public const int BG_BackDeco   = -80;
     public const int BG_MidDeco    = -60;
     public const int BG_FrontDeco  = -40;
+    public const int BG_TopDeco    = -30;
 
     public static int ResolveByCategory(DecorationCategory category)
     {
@@ -30,7 +31,7 @@ public static class DecorationSortingLayer
             case DecorationCategory.Building:      return BG_MidDeco;
             case DecorationCategory.Entrance:      return BG_MidDeco;
             case DecorationCategory.Prop:          return BG_FrontDeco;
-            case DecorationCategory.Vegetation:    return BG_FrontDeco;
+            case DecorationCategory.Vegetation:    return BG_TopDeco;
             default:                                return BG_FrontDeco;
         }
     }
