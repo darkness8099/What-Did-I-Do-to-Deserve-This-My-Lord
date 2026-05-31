@@ -1,3 +1,7 @@
+using UnityEngine;
+
+public enum HeroAttackType { Normal, AoE, Magic, Ranged }
+
 public class HeroData
 {
     public string DisplayName { get; private set; }
@@ -5,7 +9,10 @@ public class HeroData
     public int    CurrentHP   { get; private set; }
     public int    Attack      { get; private set; }
     public float  MoveSpeed   { get; private set; }
-    public float  AttackRange { get; private set; }
+    public float          AttackRange { get; private set; }
+    public float          AttackSpeed { get; private set; }
+    public HeroAttackType AttackType      { get; private set; }
+    public Vector2Int     FacingDirection { get; private set; }
 
     public HeroData()
     {
@@ -15,6 +22,9 @@ public class HeroData
         Attack      = 3;
         MoveSpeed   = 2.0f;
         AttackRange = 1.0f;
+        AttackSpeed = 2.0f;
+        AttackType      = HeroAttackType.Normal;
+        FacingDirection = Vector2Int.right;
     }
 
     public bool IsAlive()
@@ -27,4 +37,7 @@ public class HeroData
         if (damage < 0) return;
         CurrentHP = System.Math.Max(0, CurrentHP - damage);
     }
+
+
+public void SetFacingDirection(Vector2Int direction) { FacingDirection = direction; }
 }

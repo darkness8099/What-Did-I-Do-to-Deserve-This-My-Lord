@@ -38,6 +38,18 @@
 
 **`_00` 不是版本号，不是"第一个版本"，而是帧序号中的第 0 帧。** 当前只有一帧时就是 `_00`，后续美术交付更多帧时直接追加 `_01`、`_02` 即可，不需要改 `_00` 的文件名。
 
+### 程序化生成批次的命名简化
+
+当一组资源是**面向程序化生成池**的批量素材（例如 11 个无具体语义的 props、5 个杂植被变体、4 色×16 张 soil tile 变体），允许省略 `<name>` 段，使用纯 `<prefix>_<index>` 形式：
+
+| 形式 | 示例 | 适用 |
+|---|---|---|
+| 完整模板 `<prefix>_<name>_<index>` | `prop_chest_00`、`monster_slime_idle_00` | 已知具体语义的单件资源 |
+| **简化形式 `<prefix>_<index>`** | `prop_00..10`、`veg_00..04`、`building_00..02`、`entrance_00..04` | 程序化生成池的批量素材，无需个别语义 |
+| 变体形式 `<prefix>_<type>_<variant>_<index>` | `tile_soil_brown_00..15`、`tile_soil_dark_blue_00..15` | 同一 type 的多 variant 主题集 |
+
+简化形式必须在 `ART_INTAKE_LOG.md` 的对应批次备注里写明"程序化生成池，无逐张语义"，后续如需补语义可批量 rename。
+
 ### 与代码命名的区分
 
 | | 命名风格 | 示例 |
@@ -53,16 +65,20 @@
 
 | 类别 | 模板 | 示例 |
 |---|---|---|
-| **Tile** | `tile_<type>_<variant>_<index>` | `tile_soil_normal_00`、`tile_empty_glow_00`、`tile_wall_default_00`、`tile_entrance_default_00`、`tile_demonlordroom_default_00` |
+| **Tile** | `tile_<type>_<variant>_<index>` | `tile_soil_normal_00`、`tile_empty_glow_00`、`tile_wall_default_00`、`tile_entrance_default_00` |
 | **Hero** | `hero_<class>_<state>_<index>` | `hero_warrior_idle_00`、`hero_warrior_walk_e_00`、`hero_warrior_attack_00` |
 | **Monster** | `monster_<species>_<state>_<index>` | `monster_slime_idle_00`、`monster_slime_attack_00`、`monster_slime_death_00` |
-| **DemonLord** | `demonlord_<state>_<index>` 或 `demonlord_room_<element>_<index>` | `demonlord_idle_00`、`demonlord_room_bg_00`、`demonlord_room_throne_00` |
+| **DemonLord** | `demonlord_<state>_<index>` | `demonlord_idle_00`、`demonlord_captured_00` |
 | **UI Icon** | `ui_icon_<name>` | `ui_icon_hp`、`ui_icon_attack`、`ui_icon_magic` |
 | **UI Panel** | `ui_panel_<name>` | `ui_panel_victory`、`ui_panel_defeat`、`ui_panel_pause` |
 | **UI Button** | `ui_btn_<name>_<state>` | `ui_btn_restart_normal`、`ui_btn_restart_hover` |
 | **UI Font** | `ui_font_<name>` | `ui_font_title`、`ui_font_body` |
 | **Background** | `bg_<name>_<index>` | `bg_dungeon_00`、`bg_overworld_00` |
-| **Prop** | `prop_<name>_<index>` | `prop_chest_00`、`prop_torch_00` |
+| **Entrance**（多格大尺寸） | `entrance_<name>_<index>` 或简化 `entrance_<index>` | `entrance_cave_00`、`entrance_00..04`（程序化池） |
+| **Building** | `building_<name>_<index>` 或简化 `building_<index>` | `building_house_00`、`building_00..02` |
+| **SurfaceObject** | `surface_<name>_<state>_<index>` | `surface_tree_a_idle_00..04`（动画帧）、`surface_tree_b_00`、`surface_watchtower_00` |
+| **Vegetation** | `veg_<name>_<index>` 或简化 `veg_<index>` | `veg_grass_00`、`veg_00..04` |
+| **Prop** | `prop_<name>_<index>` 或简化 `prop_<index>` | `prop_chest_00`、`prop_00..10` |
 | **FX** | `fx_<event>_<index>` | `fx_dig_00`、`fx_hit_00`、`fx_slime_spawn_00` |
 | **Sprite Sheet（合集）** | 上述 + `_sheet` 后缀 | `monster_slime_idle_sheet`、`hero_warrior_walk_sheet` |
 | **Material** | `mat_<对应资源名>` | `mat_tile_soil`、`mat_monster_slime` |
@@ -77,24 +93,23 @@
 
 ## 三、Tile 命名映射本项目 CellType
 
-本项目 `GridData.CellType` 枚举已有 4 种类型，命名按以下对应：
+本项目 `GridData.CellType` 枚举已有 3 种类型，命名按以下对应：
 
 | `CellType` 枚举值 | Tile 命名前缀 | 说明 |
 |---|---|---|
-| `Soil` | `tile_soil_*` | 土块（可多变体：`surface` / `deep` / `cracked` 等） |
+| `Soil` | `tile_soil_*` | 土块（可多变体：`surface` / `deep` / `<color>` 等） |
 | `Empty` | **不需要 sprite** | 已挖空洞 —— 用 Camera clear color 黑色表达，无需贴图 |
-| `Entrance` | `tile_entrance_*` | 入口 |
-| `DemonLordRoom` | `tile_demonlordroom_*` | 魔王房间（单词连写，对应 enum） |
+| `Entrance` | **不再用 tile 命名**（TASK-042 后） | 入口已升级为多格大尺寸 sprite，独立 `Assets/Art/Entrances/`，命名 `entrance_*`；旧 `tile_entrance_*` 已删除 |
+魔王不属于 `CellType`，不使用魔王房间 tile 命名；魔王相关资源按单位命名为 `demonlord_*`。
 
-**Soil 多变体规则**：同一个 `Soil` 格子可以有多张视觉变体 sprite，用 `<variant>` 段区分：
+**Soil 多变体规则**：同一个 `Soil` 格子可以有多张视觉变体 sprite，用 `<variant>` 段区分。当前项目内 Soil variant 命名约定：
 
-| 文件名 | 含义 |
-|---|---|
-| `tile_soil_surface_00.png` | 表层土块（含碎石点，较亮） |
-| `tile_soil_deep_00.png` | 深层土块（纯暗底面） |
-| `tile_soil_cracked_00.png` | 裂缝变体（未来） |
+| 变体类型 | 文件名模式 | 示例 |
+|---|---|---|
+| 功能变体（按规则 / 区段选用） | `tile_soil_<function>_<index>` | 预留给未来明确的功能性土块，不再作为当前默认土块生成主路径 |
+| 颜色主题集（程序化生成池） | `tile_soil_<color>_<index>` | `tile_soil_brown_00..15`、`tile_soil_dark_blue_00..15`、`tile_soil_dark_green_00..15`、`tile_soil_dark_purple_red_00..15` |
 
-`GridRenderer` 可按行深度 / 随机 / 属性选择变体，选用逻辑属于代码层，不影响命名规则。
+`GridRenderer` 可按行深度 / 随机 / 属性 / 主题选择变体，选用逻辑属于代码层，不影响命名规则。
 
 未来如果新增 `Wall` 类型，命名前缀为 `tile_wall_*`。
 
@@ -156,3 +171,5 @@
 - Light2D / 阴影遮罩
 - VFX Graph / Shader Graph 资源
 - Sprite Atlas 切片命名策略（待 Sprite Sheet 接入时定）
+
+（TASK-042 已补：`entrance_*` / `building_*` / `surface_*` / `veg_*` 模板，以及程序化生成池的 `<prefix>_<index>` 简化形式。）

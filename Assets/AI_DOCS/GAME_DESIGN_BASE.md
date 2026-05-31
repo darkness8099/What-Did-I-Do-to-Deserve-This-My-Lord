@@ -18,7 +18,7 @@
     → 勇者从入口入侵
       → 魔物尝试阻止勇者
         → 胜负判定
-          ├── 勇者到达魔王位置 → 失败
+          ├── 勇者抓住魔王并带回入口 → 失败
           └── 所有勇者被击败 → 胜利
 ```
 
@@ -27,12 +27,18 @@
 ## 第一阶段 MVP 内容
 
 ### 地图系统
-- 网格尺寸：**32 列 × 18 行**
-- 每个格子类型：`Soil`（土块）/ `Empty`（空洞）/ `Wall`（不可挖边界）
-- 初始状态：全部为 Soil，边界为 Wall
+- 当前测试网格尺寸：**70 列 × 50 行**（宽度对齐当前地表背景 70 格规划；高度提升到正式测试尺寸，地表区约为顶部 10 行）
+- 每个格子类型：`Soil`（土块）/ `Empty`（空洞）/ `Entrance`（入口）
+- 入口默认位于地图中间列，并放在**地下表层下方第 1 行**；顶部 **10 行** 仅作为背景/地表展示区，不承载入口、勇者或魔王初始落点。
+- 入口下方默认保留 2-3 格固定空洞，魔王放置在该空洞中等待。
+- 地下生成起点由地表背景高度决定：顶部 **10 行** 作为背景/地表区留空，从**上往下第 11 格**开始进入地下土层；`GridManager` 按 `LevelConfig.surfaceBackgroundRows` 生成土块。
+- 魔王不是地图格子，也不是房间 tile，而是一个特殊单位。
 
 ### 挖掘系统
 - 玩家点击 Soil 格子 → 变为 Empty
+- 当前挖掘合法性：目标 Soil 的上下左右四邻中，至少有一格是 `Empty` 或 `Entrance` 才允许挖掘。
+- 初始入口下方空洞必然连通入口；后续每次挖掘都只能从已有道路向外扩展，因此暂不做 BFS 连通性检查。
+- **地下表层（入口下方紧邻的一行，由 `LevelConfig.IsSurfaceLayer(y)` 判定）** 仍作为地表与地下的视觉分界线，但**不再额外禁止点击/挖掘**。当前点击无效区域仅来自顶部 10 行背景区本身不参与玩法网格；表层视觉已并入新的 `tile_soil_<color>_<index>` 土块主题体系。
 - 无挖掘消耗（第一阶段不计成本）
 
 ### 魔物系统
@@ -41,23 +47,38 @@
 - 行为：原地等待，当勇者进入攻击范围时攻击
 
 ### 勇者系统
-- 每隔若干秒从地图左侧入口生成一名勇者
-- 勇者沿最短路径（BFS/Dijkstra）向魔王位置移动
-- 魔王位置固定在地图右侧中央
+- 默认等待 10 秒后进入魔王重新放置流程；魔王开局已存在，流程开始时视为抓起当前魔王，玩家左键选择任意 `Empty` 格完成转移后，勇者才从入口房间生成。
+- 延迟时间由 `LevelConfig` 配置，后续 UI / 波次系统完善后再接管。
+- 勇者沿最短路径（BFS/Dijkstra）向魔王单位移动
+- 当前测试阶段魔王默认位置由 `LevelConfig` 推导；倒计时结束后允许玩家把当前魔王转移到任意 Empty 格，再开始勇者流程。
 
 ### 胜负判定
-- **失败条件**：任意勇者到达魔王格子
+- **失败条件**：任意勇者抓住魔王并带回入口
 - **胜利条件**：波次内所有勇者被魔物击败
 
 ---
 
 ## 技术约束（第一阶段）
 
-- 无美术资源：全部使用 Unity Primitive + 颜色区分
 - 无音效
 - 无 UI（仅最基础的胜负文字提示）
 - 不做存档/读档
 - 不做多关卡
+
+### 视窗与输入（当前规则）
+
+**16:9 gameplay viewport（TASK-041 固化，参考 PSP 原作局部视野）：**
+
+- 目标可见范围：**约 28 列 × 16 行 土块**。
+- 可接受范围：横向 **27–30 格** / 纵向 **16–18 格**。
+- 1 土块 = 1 Unity Unit；推导 `Camera.orthographicSize = CameraViewRows ÷ 2 ≈ 8`。
+- 实现：`LevelConfig.CameraViewRows = 16`，`InputHandler.ApplyInitialCameraView` 在 Start 推导 ortho size 并覆盖 Camera Inspector 值。Inspector 上的 `orthographicSize` 仅作 Edit Mode 占位，Play Mode 总会被覆盖。
+- **必须保持 Game View aspect = 16:9**（编辑器 Game View 面板顶部 Aspect 下拉）。超宽屏（21:9）/ 现代手机比例不应被用来扩大可操作视野；多余宽度未来留给 UI / 背景 / 安全边距。
+- 不一次显示完整 64×50（未来地图）。必须靠玩家挖掘 + 视角拖动逐段展开。
+
+**输入：**
+- 鼠标左键：挖掘土块；`PlacingDemonLord` 阶段（TASK-038 流程）期间改为放置魔王。
+- 鼠标右键按住拖动：平移视角。
 
 ---
 
@@ -70,8 +91,8 @@
 
 **当前规则：**
 ```
-勇者到达魔王位置（DemonLordRoom）
-  → 切换为返回模式（HeroRouteState.ReturningToEntrance）
+勇者接近魔王单位
+  → 捕获魔王，切换为返回模式（HeroRouteState.ReturningToEntrance）
     → 沿最短路径返回入口（BFS，目标改为 Entrance）
       → 勇者到达入口 → 触发失败（Defeat）
       └── 若途中被魔物击败 → 该勇者消亡，继续正常胜负判定
@@ -83,8 +104,34 @@
 | 所有勇者在旅途中被击败 | 胜利（Victory） |
 
 **实现方式：**
-- `HeroMover.cs`：增加 `HeroRouteState` 枚举（`GoingToDemonLordRoom` / `ReturningToEntrance`），`MoveHero` 协程在到达魔王位置后切换目标为 Entrance
-- `MVPGameManager.cs`：`NotifyHeroReachedDemonLordRoom` 改为仅打印日志；新增 `NotifyHeroEscapedToEntrance` 方法触发 Defeat
+- `GridManager.cs`：当前测试阶段临时保存魔王单位起始坐标；后续由玩家放置流程替代
+- `HeroMover.cs`：使用 `HeroRouteState` 枚举（`GoingToDemonLord` / `ReturningToEntrance`），勇者寻路到魔王单位相邻可通行格，捕获后切换目标为 Entrance
+- `HeroRenderer.cs`：运行时创建测试用魔王单位视图；捕获后移除原视图并创建跟随勇者的 CaptiveDemonLord 视图
+- `MVPGameManager.cs`：`NotifyHeroReachedDemonLord` 仅打印日志；`NotifyHeroEscapedToEntrance` 触发 Defeat
+
+**魔王单位规则（当前方向）：**
+- 魔王是特殊单位，不参与战斗，不能被击杀。
+- 当前坐标仅为测试用固定值，后续由玩家放置。
+- 魔王不占用 `CellType`，地图上不存在魔王房间格。
+
+---
+
+## 系统职责边界（TASK-032 更新）
+
+| 系统 | 负责 | 不负责 |
+|------|------|--------|
+| `GridData` | 保存格子类型与土块属性数据 | 单位生命周期、渲染、输入 |
+| `GridManager` | 地图格子权威入口：土块、空洞、入口、土块属性、挖掘与地形查询 | 魔王位置、勇者状态、魔物生命、关卡测试配置 |
+| `LevelConfig` | 当前关卡/测试局的初始配置：地图尺寸、入口、魔王测试坐标、测试土块属性点 | 运行时规则、单位状态 |
+| `DemonLordManager` | 魔王特殊单位的位置与捕获状态 | 地图格子状态、战斗 |
+| `DemonLordRenderer` | 魔王单位与被捕获魔王的显示 | 勇者显示、魔王规则 |
+| `HeroManager` | 勇者数据、位置与生命周期 | 魔王数据、地图属性 |
+| `HeroMover` | 勇者路线状态、移动与捕获/返程流程 | 魔王数据所有权、格子数据写入 |
+| `MonsterManager` | 魔物数据、占位、生成与移除 | 土块属性判定、水流规则 |
+| `InputHandler` | 玩家输入坐标转换与命令转发 | 挖掘后果、生成魔物、刷新渲染 |
+| `DigActionHandler` | 玩家挖掘命令的执行编排：挖掘、刷新格子、按土块属性生成魔物 | 鼠标输入、单位 AI |
+
+未来水流扩展方向：水量、湿度、压力等数据可以进入 Grid 体系；持续扩散、流速、喷涌等复杂模拟应由独立 `WaterFlowManager` / `GridEnvironmentManager` 处理，暂不在当前阶段实现。
 
 ---
 
@@ -107,33 +154,99 @@ GridManager.Awake() 在 y=9 行的 x=6/10/14/18/22 预设 MagicPower=1、Element
 
 ---
 
-## 正式规则方向（2026-05-27 起逐步推进）
+## 正式规则方向（2026-05-30 TASK-037 更新：生态化重构）
 
-### 土块属性系统
+### 土块属性系统（双资源轴）
 
-每个土块格子将携带两个属性：
+每个 **Soil** 格子（仅 Soil，Empty / Entrance 不持有资源）携带：
 
 | 属性 | 类型 | 说明 |
 |------|------|------|
-| `MagicPower` | int | 该土块蕴含的魔力值，0 表示普通土块 |
-| `ElementType` | TileElementType | 对应元素类型（None / Slime / 未来扩展） |
+| `Nutrient` | int | 养分轴：低阶到中阶生物链的基础资源 |
+| `Magic` | int | 魔分轴：稀有、偏魔法系生态的资源（原 `MagicPower` 改名） |
+| `ElementType` | `TileElementType` | 生成倾向标签（None / Slime / 未来扩展） |
 
-**挖掘规则（正式版）：**
+读写守卫：`GridManager.GetTileAttribute / SetTileAttribute` 在非 Soil 格子上读返回 `Default`、写打 Warning 并拒绝。
+
+### 挖掘规则（正式版）
+
 ```
 玩家点击 Soil 格
-  → MagicPower == 0  →  格子变为 Empty，不生成魔物
-  → MagicPower > 0 && ElementType != None  →  格子变为 Empty，并在原地生成对应魔物
+  → IsDiggable(x, y) 通过（四邻有路）
+  → 读 attr，DigCell 改 cell 为 Empty
+  → if attr.CanSpawnMonster():
+      → 按 ElementType 选 archetype（Slime → MonsterArchetype.Slime）
+      → PlaceMonster + monster.AbsorbFromTile(ref attr)
+      → attr.ElementType = None（消费 spawn 倾向）
+  → if attr.HasResource()（仍有残余 Nutrient/Magic）:
+      → ResourceFlow.ScatterDigLeftoverResources 扩散到周围 Soil（r=1→2→3 chebyshev），都没找到则进 FloatingResourcePool
 ```
 
-**当前进度：**
-- [x] `TileAttributeData.cs` 数据结构已实现（TASK-025）
-- [x] `GridData` 已扩展 `GetTileAttribute` / `SetTileAttribute`（TASK-025）
-- [ ] 挖掘时自动生成魔物逻辑（待 TASK-026）
-- [ ] 地图初始化时为土块赋予随机属性（待后续）
+挖完 cell 已是 Empty，不再写回 attr —— 资源**只能存在于 Soil**。
 
-**MVP 阶段过渡方案：**  
-正式挖掘逻辑实装前，"点击 Empty 手动放 Slime"的临时交互暂时保留，
-两种规则可并存测试，不互相影响。
+### 怪物生态身份（Ecology Role）
+
+`MonsterEcologyRole` 枚举：`None / Carrier / Consumer / Predator / Magical / Support / Apex`。  
+`MonsterMoveStrategy` 枚举：`Static / RandomWalk / WallFollow / SeekResource / SeekFood / Flee`（字段预留，行为未实装）。
+
+身份单一来源：`MonsterArchetype`（plain class，未来可迁 ScriptableObject），由 `MonsterArchetypeRegistry` 按 `Id` 字符串注册查找。Prefab Root 挂 `MonsterIdentity` 组件填 `archetypeId`，运行时 `Resolve()` 反查 archetype。
+
+| Archetype | Role | Move | HP | Atk | NutrientCap | MagicCap | SpawnElement |
+|---|---|---|---|---|---|---|---|
+| `Slime` | Carrier | Static | 10 | 2 | 5 | **0** | Slime |
+
+> 基础史莱姆为养分系，`MagicCapacity = 0`（用户决定的设计基线，TASK-037 F6）。
+
+### 资源携带（怪物身上）
+
+`MonsterData.CurrentNutrient` / `CurrentMagic` —— spawn 时为 0，`AbsorbFromTile(ref tile)` 在挖掘时填充至 `archetype.*Capacity` 上限。`Hunger` 字段预留，本轮不参与逻辑。
+
+### 死亡原因与普通死亡回流（Death Cause / Death Return）
+
+`DeathCause` 当前最小分类：`HeroKill / PredatorEat / NaturalDecay / Starvation / LifecycleTransform / LifecycleWither / EnvironmentDeath / Unknown`。
+
+普通非捕食死亡回流只允许以下原因触发：
+- `HeroKill`
+- `EnvironmentDeath`
+
+当前 `CombatSystem` 勇者击杀怪物时，在 `RemoveMonster` 之前：
+```
+ResourceFlow.ScatterOrdinaryDeathResources(deathPos, monster, gm, DeathCause.HeroKill, "<name>")
+```
+算法：从死亡格起按 chebyshev 半径 r=1→2→3 找 Soil 环；首个非空环平均分发 Nutrient / Magic（余数给前几格）；都没找到则进 `FloatingResourcePool`（系统级游离资源缓冲）。
+
+禁止把所有 `HP <= 0` 统一接到死亡回流。捕食死亡、史莱姆自然衰弱、生命周期转化、花枯萎 / 繁殖结算均不得默认调用普通死亡散布。捕食应优先把猎物携带资源转移给捕食者；生命周期事件应进入各自策略；Empty 仍不是资源容器。
+
+### 捕食资源转移（Predation Resource Transfer）
+
+捕食是资源向生态链上层转移，不是普通死亡散布。
+
+当前最小 API：
+```
+ResourceFlow.TransferResourcesToPredator(prey, predator, reason)
+```
+
+规则：
+- 从猎物 `CurrentNutrient / CurrentMagic` 抽出资源。
+- 捕食者按 `NutrientCapacity / MagicCapacity` 剩余容量接收。
+- 捕食者装不下的剩余资源进入 `FloatingResourcePool`，后续可由蘑菇 / 游离资源系统另行处理。
+- `PredatorEat` 不调用 `ScatterOrdinaryDeathResources`，也不写入 Empty Tile。
+- 本轮只提供数据 API，不实现咬咬虫 AI、史莱姆生命周期、花苞、蘑菇。
+
+> 设计参考：[yuunama wiki 怪物数据循环](https://wikiwiki.jp/yuunama/%E3%83%A2%E3%83%B3%E3%82%B9%E3%82%BF%E3%83%BC%E3%83%87%E3%83%BC%E3%82%BF)。
+
+### 旧 `MonsterType` enum 状态
+
+标 `[System.Obsolete]`，代码内 0 实际引用，保留以避免未来外部脚本（若有）编译断裂。后续 cleanup 任务再删。
+
+### 本轮**未做**
+
+- 移动 AI（`MoveStrategy` 仅字段）
+- 饥饿消耗（`Hunger` 仅字段）
+- Monster vs Monster 捕食
+- Renderer 改实例化 Prefab 模式（继续走运行时 `new GameObject + SpriteRenderer`，TASK-029E 时一起改）
+- Debug overlay / 血条 / UI
+- ScriptableObject 数据资产（plain class + registry 够用）
 
 ---
 

@@ -4,8 +4,7 @@ public enum CellType
 {
     Soil,
     Empty,
-    Entrance,
-    DemonLordRoom
+    Entrance
 }
 
 public class GridData

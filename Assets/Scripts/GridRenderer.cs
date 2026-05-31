@@ -2,12 +2,16 @@ using UnityEngine;
 
 public class GridRenderer : MonoBehaviour
 {
-    [SerializeField] private Sprite spriteSoilSurface;
-    [SerializeField] private Sprite spriteSoilDeep;
+    [SerializeField] private Sprite[] soilBrownSprites;
+    [SerializeField] private Sprite[] soilDarkBlueSprites;
+    [SerializeField] private Sprite[] soilDarkGreenSprites;
+    [SerializeField] private Sprite[] soilDarkPurpleRedSprites;
+    [SerializeField] private Sprite spriteEntrance;
+
+    private const int SoilBandHeight = 8;
 
     private static readonly Color ColorEmpty         = new Color(0.10f, 0.10f, 0.10f);
     private static readonly Color ColorEntrance      = new Color(0.20f, 0.80f, 0.20f);
-    private static readonly Color ColorDemonLordRoom = new Color(0.85f, 0.15f, 0.15f);
     private static readonly Color ColorSoilFallback  = new Color(0.55f, 0.35f, 0.15f);
 
     private GridManager    gridManager;
@@ -84,11 +88,17 @@ public void RefreshCell(int x, int y)
 
 private void ApplyCellVisual(SpriteRenderer sr, int x, int y, CellType type)
     {
+        if (type == CellType.Empty && gridManager.IsSurfaceBackgroundRow(y))
+        {
+            sr.sprite = null;
+            sr.color = Color.white;
+            return;
+        }
+
         switch (type)
         {
             case CellType.Soil:
-                bool useDeep = y < gridManager.GetGridData().Height / 2;
-                Sprite soilSprite = useDeep ? spriteSoilDeep : spriteSoilSurface;
+                Sprite soilSprite = ResolveSoilSprite(x, y);
                 sr.sprite = soilSprite != null ? soilSprite : _whitePlaceholder;
                 sr.color  = soilSprite != null ? Color.white : ColorSoilFallback;
                 break;
@@ -97,17 +107,56 @@ private void ApplyCellVisual(SpriteRenderer sr, int x, int y, CellType type)
                 sr.color  = ColorEmpty;
                 break;
             case CellType.Entrance:
-                sr.sprite = _whitePlaceholder;
-                sr.color  = ColorEntrance;
-                break;
-            case CellType.DemonLordRoom:
-                sr.sprite = _whitePlaceholder;
-                sr.color  = ColorDemonLordRoom;
+                sr.sprite = spriteEntrance != null ? spriteEntrance : _whitePlaceholder;
+                sr.color  = spriteEntrance != null ? Color.white : ColorEntrance;
                 break;
             default:
                 sr.sprite = _whitePlaceholder;
                 sr.color  = ColorSoilFallback;
                 break;
         }
+    }
+
+    private Sprite ResolveSoilSprite(int x, int y)
+    {
+        int rowFromTop = GetRowFromTop(y);
+        int undergroundRowFromTop = rowFromTop - 10;
+        if (undergroundRowFromTop <= 0)
+            return GetFallbackSoilSprite();
+
+        int bandIndex = Mathf.Max(0, (undergroundRowFromTop - 1) / SoilBandHeight);
+        Sprite[] bandSprites = GetSoilPaletteForBand(bandIndex);
+        if (bandSprites == null || bandSprites.Length == 0)
+            return GetFallbackSoilSprite();
+
+        int spriteIndex = Mathf.Abs((x * 17) + (y * 31)) % bandSprites.Length;
+        return bandSprites[spriteIndex];
+    }
+
+    private int GetRowFromTop(int y)
+    {
+        GridData data = gridManager.GetGridData();
+        return data.Height - y;
+    }
+
+    private Sprite[] GetSoilPaletteForBand(int bandIndex)
+    {
+        switch (bandIndex % 4)
+        {
+            case 0: return soilBrownSprites;
+            case 1: return soilDarkBlueSprites;
+            case 2: return soilDarkGreenSprites;
+            case 3: return soilDarkPurpleRedSprites;
+            default: return soilBrownSprites;
+        }
+    }
+
+    private Sprite GetFallbackSoilSprite()
+    {
+        Sprite[] brownSprites = soilBrownSprites;
+        if (brownSprites != null && brownSprites.Length > 0)
+            return brownSprites[0];
+
+        return null;
     }
 }

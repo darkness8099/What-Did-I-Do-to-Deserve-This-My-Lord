@@ -1,0 +1,3 @@
+display_name: Unity Code Review
+short_description: Review Unity C# scripts against project rules.
+default_prompt: Use this skill to review Unity C# scripts for responsibility boundaries, gameplay correctness, and AI_DOCS compliance.

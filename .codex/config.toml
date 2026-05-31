@@ -1,0 +1,20 @@
+[mcp_servers.UnityMCP]
+url = "http://127.0.0.1:8080/mcp"
+
+[mcp_servers.UnityMCP.tools.batch_execute]
+approval_mode = "approve"
+
+[mcp_servers.UnityMCP.tools.execute_code]
+approval_mode = "approve"
+
+[mcp_servers.UnityMCP.tools.read_console]
+approval_mode = "approve"
+
+[mcp_servers.UnityMCP.tools.refresh_unity]
+approval_mode = "approve"
+
+[mcp_servers.UnityMCP.tools.manage_scene]
+approval_mode = "approve"
+
+[mcp_servers.UnityMCP.tools.find_gameobjects]
+approval_mode = "approve"

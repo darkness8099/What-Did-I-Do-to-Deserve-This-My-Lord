@@ -1,0 +1,3 @@
+display_name: Art Intake Audit
+short_description: Audit Unity art intake and sprite rules.
+default_prompt: Use this skill to audit Assets/Art against the project's art intake and naming rules.

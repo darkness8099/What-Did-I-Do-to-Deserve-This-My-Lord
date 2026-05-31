@@ -13,7 +13,13 @@
 ```
 Assets/
 ├── Art/                       ← 正式资源（已确认导入、命名规范、Import Setting 已调）
-│   ├── Tiles/                 ← Soil 变体 / Entrance / DemonLordRoom（Empty 格无 sprite）
+│   ├── Tiles/                 ← 核心 48×48 单格 tile：Soil 变体（含 color 主题集）等
+│   ├── Entrances/             ← 多格大尺寸入口素材（独立类别，不是 Tile 子类）
+│   ├── Backgrounds/           ← 场外大背景 / 远景 / 底图
+│   ├── SurfaceObjects/        ← 地表大型装饰：大树、风车、瞭望塔、大型岩石等（含动画帧）
+│   ├── Buildings/             ← 房屋、旅店、商店、教堂等建筑
+│   ├── Vegetation/            ← 草丛、小花、灌木、蘑菇、藤蔓、苔藓装饰等
+│   ├── Props/                 ← 木桶、箱子、路牌、栅栏、石碑、断柱、碎石等非植物小道具
 │   ├── Characters/
 │   │   ├── Heroes/            ← 勇者（含未来多兵种）
 │   │   └── Monsters/          ← Slime 及未来魔物
@@ -22,9 +28,7 @@ Assets/
 │   │   ├── Icons/             ← 小图标
 │   │   ├── Panels/            ← 胜负面板、HUD 背景
 │   │   └── Fonts/             ← 字体（如提供）
-│   ├── Backgrounds/           ← 场外背景
-│   ├── Props/                 ← 装饰物（宝箱、火把等，后续）
-│   └── FX/                    ← 粒子贴图、Sprite Sheet（后续）
+│   └── FX/                    ← 粒子贴图、Effects 类（挖掘尘土、爆炸碎片等）
 └── Art/_Incoming/             ← 临时暂存区（直接平铺，已英文命名，未审核）
 ```
 
@@ -97,14 +101,36 @@ Assets/
 
 ## 四、Import Setting 默认值（2D URP 项目）
 
-本项目为 Unity 2022.3.58f1 + URP 2D，所有美术资源默认按以下设置导入：
+本项目为 Unity 2022.3.58f1 + URP 2D，所有美术资源默认按以下设置导入。**全部走像素风规则**（PPU=48 / Point / Uncompressed / no mipmap / alphaIsTransparency=true / wrapMode=Clamp）；高分辨率插画不在本项目当前范围。
 
-| 资源类型 | Texture Type | Filter Mode | Compression | Pixel Per Unit |
-|---|---|---|---|---|
-| 像素风 Tile / Sprite | Sprite (2D and UI) | **Point (no filter)** | None | **48**（本项目当前规格：48×48 px，1格=1 Unity unit） |
-| 高分辨率插画 / UI | Sprite (2D and UI) | Bilinear | Normal Quality | 100（Unity 默认） |
-| 字体（位图） | Sprite (2D and UI) | Point | None | 按设计 |
-| 背景大图 | Sprite (2D and UI) | Bilinear | Normal Quality | 100 |
+### 通用 Import Setting
+
+| 项 | 值 |
+|---|---|
+| Texture Type | Sprite (2D and UI) |
+| Sprite Mode | Single（默认）/ Multiple（Sprite Sheet 时） |
+| Filter Mode | **Point (no filter)** |
+| Compression | **None** |
+| Pixels Per Unit | **48** |
+| Generate Mip Maps | Off |
+| Alpha Is Transparency | true |
+| Wrap Mode | Clamp |
+
+### 按类别的 Pivot / maxTextureSize 默认
+
+| 类别 | Pivot | maxTextureSize | 备注 |
+|---|---|---|---|
+| Tiles | **Center** | 2048（默认） | 核心 48×48 单格，居中对齐 grid cell |
+| Backgrounds | **Center** | **4096** | 大背景可能超 2048 宽（如 3360×480 = 70×10 格） |
+| Entrances | **Bottom Center** | 2048 | 多格大尺寸入口，底部对齐地面 |
+| Buildings | **Bottom Center** | 2048 | 站立式建筑，底部对齐地面 |
+| SurfaceObjects | **Bottom Center** | 2048 | 树 / 瞭望塔 / 大岩石等地表装饰 |
+| Vegetation | **Bottom Center** | 2048 | 植被站立 |
+| Props | **Bottom Center** | 2048 | 道具放在地上 |
+| Characters | Bottom Center | 2048 | 角色站立 |
+| DemonLord | Center | 2048 | 浮空 / 自由位置 |
+| UI | Center | 2048 | UI 元素自由 |
+| FX | Center | 2048 | 特效中心对齐 |
 
 **材质**：使用 URP 2D 提供的 `Sprite-Lit-Default` / `Sprite-Unlit-Default`，不使用旧 Standard Shader。
 

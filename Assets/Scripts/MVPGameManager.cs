@@ -21,9 +21,9 @@ public class MVPGameManager : MonoBehaviour
 
     public GameState GetCurrentState() => CurrentState;
 
-    public void NotifyHeroReachedDemonLordRoom(int heroId)
+    public void NotifyHeroReachedDemonLord(int heroId)
     {
-        Debug.Log($"[MVPGameManager] Hero {heroId} reached DemonLordRoom — beginning return journey.");
+        Debug.Log($"[MVPGameManager] Hero {heroId} captured DemonLord — beginning return journey.");
     }
 
     public void NotifyHeroDefeated(int heroId)

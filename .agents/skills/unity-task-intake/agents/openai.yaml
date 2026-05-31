@@ -1,0 +1,4 @@
+interface:
+  display_name: "Unity Task Intake"
+  short_description: "Start Unity tasks from AI_DOCS safely"
+  default_prompt: "Use this skill before starting a Unity project task to read AI_DOCS, identify scope, and produce a safe execution plan."

@@ -1,0 +1,3 @@
+display_name: Unity Refactor Plan
+short_description: Plan safe staged Unity refactors.
+default_prompt: Use this skill to produce a staged refactor plan for Unity gameplay systems without changing code.

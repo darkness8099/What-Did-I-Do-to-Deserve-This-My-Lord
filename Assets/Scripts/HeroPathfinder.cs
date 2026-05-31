@@ -62,8 +62,7 @@ public class HeroPathfinder
     {
         CellType type = gridData.GetCell(pos.x, pos.y);
         return type == CellType.Empty
-            || type == CellType.Entrance
-            || type == CellType.DemonLordRoom;
+            || type == CellType.Entrance;
     }
 
     private static List<Vector2Int> ReconstructPath(

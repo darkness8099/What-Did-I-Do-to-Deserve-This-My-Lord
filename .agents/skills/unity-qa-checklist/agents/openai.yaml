@@ -1,0 +1,3 @@
+display_name: Unity QA Checklist
+short_description: Plan Unity A/B/C validation.
+default_prompt: Use this skill to create a validation checklist for a Unity task using the project's A/B/C testing policy.

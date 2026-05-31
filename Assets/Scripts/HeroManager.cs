@@ -88,12 +88,6 @@ public class HeroManager : MonoBehaviour
 
     private Vector2Int FindEntrance()
     {
-        GridData data = gridManager.GetGridData();
-        for (int x = 0; x < data.Width; x++)
-            for (int y = 0; y < data.Height; y++)
-                if (data.GetCell(x, y) == CellType.Entrance)
-                    return new Vector2Int(x, y);
-
-        return new Vector2Int(-1, -1);
+        return gridManager.GetEntrancePosition();
     }
 }

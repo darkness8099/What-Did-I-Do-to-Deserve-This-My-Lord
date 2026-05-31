@@ -2,44 +2,43 @@ using UnityEngine;
 
 public class GridManager : MonoBehaviour
 {
-    [SerializeField] private int width = 32;
-    [SerializeField] private int height = 18;
+    private static readonly Vector2Int[] CardinalDirections =
+    {
+        new Vector2Int( 0,  1),
+        new Vector2Int( 0, -1),
+        new Vector2Int(-1,  0),
+        new Vector2Int( 1,  0),
+    };
 
+    private LevelConfig levelConfig;
     private GridData gridData;
-
-    private static readonly Vector2Int EntrancePos    = new Vector2Int(0, 9);
-    private static readonly Vector2Int DemonLordRoomPos = new Vector2Int(31, 9);
 
     private void Awake()
     {
-        gridData = new GridData(width, height);
+        levelConfig = GetComponent<LevelConfig>() ?? FindObjectOfType<LevelConfig>();
+        if (levelConfig == null)
+        {
+            Debug.LogError("[GridManager] LevelConfig not found in scene.");
+            return;
+        }
 
-        gridData.SetCell(EntrancePos.x,      EntrancePos.y,      CellType.Entrance);
-        gridData.SetCell(DemonLordRoomPos.x,  DemonLordRoomPos.y, CellType.DemonLordRoom);
+        gridData = new GridData(levelConfig.Width, levelConfig.Height);
+        levelConfig.ApplyInitialGrid(gridData);
 
-        // MVP 临时测试配置：预设带属性土块，用于验证挖掘自动生成逻辑。
-        // 后续将替换为正式地图配置或资源数据。
-        int[] testX = { 6, 10, 14, 18, 22 };
-        foreach (int tx in testX)
-            gridData.SetTileAttribute(tx, 9, new TileAttributeData(1, TileElementType.Slime));
-
-        Debug.Log($"[GridManager] Grid initialized: {width}x{height}");
-        Debug.Log($"[GridManager] Entrance: ({EntrancePos.x},{EntrancePos.y}), DemonLordRoom: ({DemonLordRoomPos.x},{DemonLordRoomPos.y})");
-        Debug.Log("[GridManager] Test Slime attributes set at y=9, x=6/10/14/18/22.");
+        Vector2Int entrance = levelConfig.EntrancePosition;
+        Debug.Log($"[GridManager] Grid initialized: {levelConfig.Width}x{levelConfig.Height}");
+        Debug.Log($"[GridManager] Entrance: ({entrance.x},{entrance.y}).");
+        Vector2Int demonLord = levelConfig.DemonLordStartPosition;
+        Debug.Log($"[GridManager] DemonLord start: ({demonLord.x},{demonLord.y}).");
     }
 
     public bool DigCell(int x, int y)
     {
-        if (!gridData.IsInside(x, y))
+        if (!IsDiggable(x, y))
         {
-            Debug.LogWarning($"[GridManager] DigCell: ({x}, {y}) is out of bounds. Ignored.");
+            Debug.Log($"[GridManager] DigCell: ({x}, {y}) is not diggable.");
             return false;
         }
-
-        CellType current = gridData.GetCell(x, y);
-
-        if (current != CellType.Soil)
-            return false;
 
         gridData.SetCell(x, y, CellType.Empty);
         return true;
@@ -50,18 +49,68 @@ public class GridManager : MonoBehaviour
         return gridData.GetCell(x, y);
     }
 
+    public bool IsInside(int x, int y)
+    {
+        return gridData.IsInside(x, y);
+    }
+
+    public bool IsWalkable(int x, int y)
+    {
+        CellType type = gridData.GetCell(x, y);
+        return type == CellType.Empty || type == CellType.Entrance;
+    }
+
+    public bool IsDiggable(int x, int y)
+    {
+        if (!gridData.IsInside(x, y)) return false;
+        if (gridData.GetCell(x, y) != CellType.Soil) return false;
+
+        foreach (Vector2Int direction in CardinalDirections)
+        {
+            int nx = x + direction.x;
+            int ny = y + direction.y;
+            if (gridData.IsInside(nx, ny) && IsWalkable(nx, ny))
+                return true;
+        }
+
+        return false;
+    }
+
     public GridData GetGridData()
     {
         return gridData;
     }
 
+    public Vector2Int GetEntrancePosition()
+    {
+        return levelConfig.EntrancePosition;
+    }
+
+    public bool IsSurfaceLayer(int y)
+    {
+        return levelConfig != null && levelConfig.IsSurfaceLayer(y);
+    }
+
+    public bool IsSurfaceBackgroundRow(int y)
+    {
+        return levelConfig != null && levelConfig.IsSurfaceBackgroundRow(y);
+    }
+
     public TileAttributeData GetTileAttribute(int x, int y)
     {
+        if (!gridData.IsInside(x, y)) return TileAttributeData.Default;
+        if (gridData.GetCell(x, y) != CellType.Soil) return TileAttributeData.Default;
         return gridData.GetTileAttribute(x, y);
     }
 
     public void SetTileAttribute(int x, int y, TileAttributeData attribute)
     {
+        if (!gridData.IsInside(x, y)) return;
+        if (gridData.GetCell(x, y) != CellType.Soil)
+        {
+            Debug.LogWarning($"[GridManager] SetTileAttribute on non-Soil cell ({x},{y}) ignored.");
+            return;
+        }
         gridData.SetTileAttribute(x, y, attribute);
     }
 }

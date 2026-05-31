@@ -1,14 +1,15 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class HeroRenderer : MonoBehaviour
 {
     private HeroManager heroManager;
-    private Dictionary<int, GameObject> views = new Dictionary<int, GameObject>();
+    private Dictionary<int, GameObject> views    = new Dictionary<int, GameObject>();
     private Transform viewsParent;
-    private Material matHero;
+    [SerializeField] private Sprite spriteHero;
 
-    private void Start()
+private void Start()
     {
         heroManager = GetComponent<HeroManager>();
         if (heroManager == null)
@@ -19,7 +20,6 @@ public class HeroRenderer : MonoBehaviour
         var parentGO = new GameObject("HeroViews");
         viewsParent = parentGO.transform;
 
-        matHero = MakeMat(new Color(0.20f, 0.55f, 1.00f));
         Debug.Log("[HeroRenderer] Initialized.");
     }
 
@@ -31,7 +31,7 @@ public class HeroRenderer : MonoBehaviour
         return go;
     }
 
-    public void CreateHeroView(int heroId)
+public void CreateHeroView(int heroId)
     {
         if (heroManager == null) return;
 
@@ -45,16 +45,17 @@ public class HeroRenderer : MonoBehaviour
 
         Vector2Int pos = heroManager.GetHeroPosition(heroId);
 
-        var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        quad.name = $"Hero_{heroId}";
-        quad.transform.SetParent(viewsParent, false);
-        quad.transform.position = new Vector3(pos.x + 0.5f, pos.y + 0.5f, -0.2f);
-        quad.transform.localScale = new Vector3(0.7f, 0.7f, 1f);
+        var go = new GameObject($"Hero_{heroId}");
+        go.transform.SetParent(viewsParent, false);
+        go.transform.position   = new Vector3(pos.x + 0.5f, pos.y + 0.5f, -0.2f);
+        go.transform.localScale = new Vector3(0.85f, 0.85f, 1f);
 
-        Destroy(quad.GetComponent<MeshCollider>());
-        quad.GetComponent<MeshRenderer>().sharedMaterial = matHero;
+        var sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite       = spriteHero;
+        sr.color        = Color.white;
+        sr.sortingOrder = 1;
 
-        views[heroId] = quad;
+        views[heroId] = go;
         Debug.Log($"[HeroRenderer] Created view for Hero_{heroId} at grid ({pos.x},{pos.y}).");
     }
 
@@ -70,17 +71,5 @@ public class HeroRenderer : MonoBehaviour
         Destroy(go);
         views.Remove(heroId);
         return true;
-    }
-
-    private static Material MakeMat(Color color)
-    {
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-        if (shader == null) shader = Shader.Find("Unlit/Color");
-        if (shader == null) shader = Shader.Find("Standard");
-
-        var mat = new Material(shader);
-        mat.SetColor("_BaseColor", color);
-        if (mat.HasProperty("_Color")) mat.SetColor("_Color", color);
-        return mat;
     }
 }

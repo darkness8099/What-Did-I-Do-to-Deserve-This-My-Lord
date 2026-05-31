@@ -3,78 +3,111 @@ using UnityEngine;
 public class InputHandler : MonoBehaviour
 {
     [SerializeField] private Camera mainCamera;
-    [SerializeField] private GridManager gridManager;
-    [SerializeField] private GridRenderer gridRenderer;
-    [SerializeField] private MonsterManager monsterManager;
-    [SerializeField] private MonsterRenderer monsterRenderer;
+    [SerializeField] private DigActionHandler digActionHandler;
+
+    private LevelConfig levelConfig;
+    private GridManager gridManager;
+    private DemonLordManager demonLordManager;
+    private DemonLordRenderer demonLordRenderer;
+    private Vector3 lastDragWorldPosition;
+    private bool isDraggingCamera;
 
     private void Start()
     {
-        if (mainCamera == null)      mainCamera      = Camera.main;
-        if (gridManager == null)     gridManager     = FindObjectOfType<GridManager>();
-        if (gridRenderer == null)    gridRenderer    = FindObjectOfType<GridRenderer>();
-        if (monsterManager == null)  monsterManager  = FindObjectOfType<MonsterManager>();
-        if (monsterRenderer == null) monsterRenderer = FindObjectOfType<MonsterRenderer>();
+        if (mainCamera == null) mainCamera = Camera.main;
+        levelConfig = GetComponent<LevelConfig>() ?? FindObjectOfType<LevelConfig>();
+        gridManager = GetComponent<GridManager>() ?? FindObjectOfType<GridManager>();
+        demonLordManager = GetComponent<DemonLordManager>() ?? FindObjectOfType<DemonLordManager>();
+        demonLordRenderer = GetComponent<DemonLordRenderer>() ?? FindObjectOfType<DemonLordRenderer>();
+        if (digActionHandler == null) digActionHandler = GetComponent<DigActionHandler>() ?? FindObjectOfType<DigActionHandler>();
 
         if (mainCamera == null)
             Debug.LogError("[InputHandler] Main Camera not found.");
+        if (levelConfig == null)
+            Debug.LogError("[InputHandler] LevelConfig not found.");
         if (gridManager == null)
             Debug.LogError("[InputHandler] GridManager not found.");
-        if (gridRenderer == null)
-            Debug.LogError("[InputHandler] GridRenderer not found.");
-        if (monsterManager == null)
-            Debug.LogError("[InputHandler] MonsterManager not found.");
-        if (monsterRenderer == null)
-            Debug.LogError("[InputHandler] MonsterRenderer not found.");
+        if (demonLordManager == null)
+            Debug.LogError("[InputHandler] DemonLordManager not found.");
+        if (demonLordRenderer == null)
+            Debug.LogError("[InputHandler] DemonLordRenderer not found.");
+        if (digActionHandler == null)
+            Debug.LogError("[InputHandler] DigActionHandler not found.");
+
+        ApplyInitialCameraView();
     }
 
-private void Update()
+    private void Update()
     {
+        HandleCameraDrag();
+
         if (!Input.GetMouseButtonDown(0)) return;
+        if (isDraggingCamera) return;
 
-        Vector3 mousePos = Input.mousePosition;
-        mousePos.z = -mainCamera.transform.position.z;
-        Vector3 worldPos = mainCamera.ScreenToWorldPoint(mousePos);
-
+        Vector3 worldPos = GetMouseWorldPosition();
         int x = Mathf.FloorToInt(worldPos.x);
         int y = Mathf.FloorToInt(worldPos.y);
 
-        if (!gridManager.GetGridData().IsInside(x, y))
+        if (TryHandleDemonLordPlacement(x, y)) return;
+
+        digActionHandler.HandlePrimaryClick(x, y);
+    }
+
+    private bool TryHandleDemonLordPlacement(int x, int y)
+    {
+        if (demonLordManager == null || !demonLordManager.IsWaitingForPlacement) return false;
+
+        var gridPos = new Vector2Int(x, y);
+        if (demonLordManager.TryPlaceAt(gridPos, gridManager))
         {
-            Debug.Log($"[InputHandler] Click outside map: ({x},{y})");
+            if (demonLordRenderer != null)
+                demonLordRenderer.MoveDemonLordViewTo(gridPos);
+            return true;
+        }
+
+        Debug.Log($"[InputHandler] DemonLord placement rejected at ({x},{y}). Select an Empty cell.");
+        return true;
+    }
+
+    private void ApplyInitialCameraView()
+    {
+        if (mainCamera == null || levelConfig == null) return;
+
+        mainCamera.orthographic = true;
+        mainCamera.orthographicSize = levelConfig.CameraViewRows * 0.5f;
+
+        Vector2 center = levelConfig.CameraStartCenter;
+        mainCamera.transform.position = new Vector3(center.x, center.y, mainCamera.transform.position.z);
+    }
+
+    private void HandleCameraDrag()
+    {
+        if (mainCamera == null) return;
+
+        if (Input.GetMouseButtonDown(1))
+        {
+            isDraggingCamera = true;
+            lastDragWorldPosition = GetMouseWorldPosition();
             return;
         }
 
-        CellType cell = gridManager.GetCellType(x, y);
-
-        if (cell == CellType.Soil)
+        if (Input.GetMouseButtonUp(1))
         {
-            TileAttributeData attr = gridManager.GetTileAttribute(x, y);
-
-            if (gridManager.DigCell(x, y))
-            {
-                gridRenderer.RefreshCell(x, y);
-
-                if (attr.CanSpawnMonster() && attr.ElementType == TileElementType.Slime)
-                {
-                    if (monsterManager.PlaceSlime(x, y))
-                    {
-                        MonsterData data = monsterManager.GetMonster(x, y);
-                        monsterRenderer.CreateMonsterView(x, y, data);
-                        Debug.Log($"[InputHandler] Auto-spawned Slime at ({x},{y}) from tile attribute.");
-                    }
-                    gridManager.SetTileAttribute(x, y, TileAttributeData.Default);
-                }
-            }
+            isDraggingCamera = false;
             return;
         }
 
-        if (cell == CellType.Empty)
-        {
-            Debug.Log($"[InputHandler] Empty tile clicked at ({x},{y}), no action.");
-            return;
-        }
+        if (!Input.GetMouseButton(1) || !isDraggingCamera) return;
 
-        // CellType.Entrance / DemonLordRoom → 不做任何操作
+        Vector3 currentWorldPosition = GetMouseWorldPosition();
+        Vector3 delta = lastDragWorldPosition - currentWorldPosition;
+        mainCamera.transform.position += new Vector3(delta.x, delta.y, 0f);
+    }
+
+    private Vector3 GetMouseWorldPosition()
+    {
+        Vector3 mousePos = Input.mousePosition;
+        mousePos.z = -mainCamera.transform.position.z;
+        return mainCamera.ScreenToWorldPoint(mousePos);
     }
 }

@@ -6,9 +6,9 @@ public class MonsterRenderer : MonoBehaviour
     private MonsterManager monsterManager;
     private Dictionary<Vector2Int, GameObject> views;
     private Transform viewsParent;
-    private Material matSlime;
+    [SerializeField] private Sprite spriteSlime;
 
-    private void Start()
+private void Start()
     {
         monsterManager = GetComponent<MonsterManager>();
         if (monsterManager == null)
@@ -25,8 +25,6 @@ public class MonsterRenderer : MonoBehaviour
         var parentGO = new GameObject("MonsterViews");
         viewsParent = parentGO.transform;
 
-        matSlime = MakeMat(new Color(1.0f, 0.85f, 0.0f));
-
         Debug.Log("[MonsterRenderer] Initialized.");
     }
 
@@ -35,7 +33,7 @@ public class MonsterRenderer : MonoBehaviour
         return views != null && views.ContainsKey(new Vector2Int(x, y));
     }
 
-    public void CreateMonsterView(int x, int y, MonsterData data)
+public void CreateMonsterView(int x, int y, MonsterData data)
     {
         if (HasMonsterView(x, y))
         {
@@ -43,16 +41,17 @@ public class MonsterRenderer : MonoBehaviour
             return;
         }
 
-        var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        quad.name = $"Slime_{x}_{y}";
-        quad.transform.SetParent(viewsParent, false);
-        quad.transform.position = new Vector3(x + 0.5f, y + 0.5f, -0.1f);
-        quad.transform.localScale = new Vector3(0.6f, 0.6f, 1f);
+        var go = new GameObject($"Slime_{x}_{y}");
+        go.transform.SetParent(viewsParent, false);
+        go.transform.position   = new Vector3(x + 0.5f, y + 0.5f, -0.1f);
+        go.transform.localScale = new Vector3(0.85f, 0.85f, 1f);
 
-        Destroy(quad.GetComponent<MeshCollider>());
-        quad.GetComponent<MeshRenderer>().sharedMaterial = matSlime;
+        var sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite       = spriteSlime;
+        sr.color        = Color.white;
+        sr.sortingOrder = 0;
 
-        views[new Vector2Int(x, y)] = quad;
+        views[new Vector2Int(x, y)] = go;
     }
 
     public GameObject GetMonsterView(int x, int y)
@@ -70,15 +69,5 @@ public class MonsterRenderer : MonoBehaviour
         return true;
     }
 
-    private static Material MakeMat(Color color)
-    {
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-        if (shader == null) shader = Shader.Find("Unlit/Color");
-        if (shader == null) shader = Shader.Find("Standard");
 
-        var mat = new Material(shader);
-        mat.SetColor("_BaseColor", color);
-        if (mat.HasProperty("_Color")) mat.SetColor("_Color", color);
-        return mat;
-    }
 }

@@ -1528,4 +1528,1052 @@ GridData → GridManager → GridRenderer → InputHandler（挖掘）
   - 验收 TASK-030（C 类 Play Mode 测试）后，考虑类似方式接入 `hero_warrior_idle_00` / `monster_slime_idle_00` 到 HeroRenderer / MonsterRenderer
   - 或讨论 TASK-029E（Prefab 自动化）路线
 
+---
+
+### 2026-05-30 TASK-032 — 管理器职责拆分与 GridManager 收窄
+
+**阶段：阶段 9 / 架构整理 — 管理器职责边界**
+
+- **目标**：
+  - 前 6 步落地：职责表、`LevelConfig`、`DemonLordManager`、`DemonLordRenderer`、收窄 `GridManager`、收敛 `InputHandler`
+  - 暂不实现第 7 步水流模拟；水流保留为后续玩法扩充
+
+- **修改内容**：
+  - 新增 `Assets/Scripts/LevelConfig.cs`
+  - 新增 `Assets/Scripts/DemonLordManager.cs`
+  - 新增 `Assets/Scripts/DemonLordRenderer.cs`
+  - 新增 `Assets/Scripts/DigActionHandler.cs`
+  - 修改 `GridManager.cs`：移除魔王坐标与测试 Slime 属性硬编码，改由 `LevelConfig` 初始化；新增 `IsInside` / `IsWalkable` / `IsDiggable`
+  - 修改 `HeroMover.cs`：魔王位置与捕获状态改问 `DemonLordManager`；魔王跟随视觉改交给 `DemonLordRenderer`
+  - 修改 `HeroRenderer.cs`：移除魔王显示和 CaptiveDemonLord 逻辑，仅保留勇者显示
+  - 修改 `InputHandler.cs`：只负责鼠标坐标转换，点击命令转交 `DigActionHandler`
+  - 修改 `MonsterManager.cs` / `HeroManager.cs`：减少对 `GridData` 内部结构的直接依赖
+  - 更新 `GAME_DESIGN_BASE.md` 职责表；更新 `TASKS.md` 标记 TASK-032
+
+- **场景状态**：
+  - 使用 `execute_code` 在 `GridManager` GameObject 上确保挂载 `LevelConfig` / `DemonLordManager` / `DemonLordRenderer` / `DigActionHandler`
+  - 已将 `Assets/Art/DemonLord/demonlord_idle_00.png` 赋给 `DemonLordRenderer.spriteDemonLord`
+  - `GameScene.isDirty=true`，AI 未保存 Scene，请人工验收后保存
+
+- **A/B 类验证**：
+  - `refresh_unity(force/all)` 后编译零 Error
+  - Console 仅剩 MCP WebSocket warning（与本次代码无关）
+  - `GridData.IsInside` / `SetCell` / `GetCell` / `TileAttribute` 验证通过
+  - `GridManager.IsInside` / `DigCell` 验证通过
+  - `LevelConfig` 入口和测试 Slime 属性应用验证通过
+  - `DemonLordManager` 初始位置和 Capture 状态验证通过
+  - 场景中 4 个新组件存在验证通过
+
+- **经验 / 后续注意**：
+  - `GridManager` 当前定位为格子生态权威入口，不再拥有魔王单位或测试关卡配置
+  - `DigActionHandler` 是输入与挖掘后果之间的编排层，避免 `InputHandler` 继续膨胀
+  - 后续可继续讨论是否将 `LevelConfig` 升级为 ScriptableObject / 关卡数据资产
+  - 水流扩展应先设计数据表达，再新建 `WaterFlowManager`，不要直接塞回 `GridManager`
+
+---
+
+### 2026-05-30 TASK-029E-pre2 — 第一批 Visual Prefab 试验
+
+**阶段：阶段 9 — 美术资源接入与 Prefab 自动化预备**
+
+- **任务目标**：
+  - 使用当前已导入并整理好的 6 张 sprite，通过 Unity MCP / Unity Editor API 创建第一批视觉 Prefab
+  - 本次只创建 `Root/Visual/SpriteRenderer` 结构，不挂 gameplay 脚本，不做架构重构，不替换 Scene 中对象
+
+- **创建的 Prefab**：
+
+  | Prefab | Sprite |
+  |---|---|
+  | `Assets/Prefabs/PF_Hero_Default.prefab` | `Assets/Art/Characters/Heroes/hero_warrior_idle_00.png` |
+  | `Assets/Prefabs/PF_DemonLord_Default.prefab` | `Assets/Art/DemonLord/demonlord_idle_00.png` |
+  | `Assets/Prefabs/PF_Monster_Slime_Default.prefab` | `Assets/Art/Characters/Monsters/monster_slime_idle_00.png` |
+  | `Assets/Prefabs/PF_Tile_Underground_Soil_Dark.prefab` | `Assets/Art/Tiles/tile_soil_deep_00.png` |
+  | `Assets/Prefabs/PF_Tile_Underground_Soil_Top.prefab` | `Assets/Art/Tiles/tile_soil_surface_00.png` |
+  | `Assets/Prefabs/PF_Environment_Entrance_Default.prefab` | `Assets/Art/Tiles/tile_entrance_default_00.png` |
+
+- **Prefab 结构验证**：
+
+  ```text
+  Root GameObject
+  └── Visual
+      └── SpriteRenderer
+  ```
+
+  - `manage_prefabs(get_hierarchy)` 验证 6 个 Prefab 均为 2 个对象：Root + `Visual`
+  - `Visual` 均挂载 `SpriteRenderer`
+  - Root 不挂 gameplay 脚本，仅保留 `Transform`
+
+- **创建 / 修改文件**：
+  - 新增 `Assets/Prefabs/`
+  - 新增 `Assets/Prefabs.meta`
+  - 新增 6 个 `.prefab`
+  - Unity 自动生成 6 个 `.prefab.meta`
+  - 更新 `Assets/AI_DOCS/TASKS.md`：标记 `TASK-029E-pre2` 完成
+  - 追加本条 `Assets/AI_DOCS/AI_WORKFLOW_LOG.md` 记录
+
+- **Unity / Scene 状态**：
+  - 通过 `execute_code` 使用 `AssetDatabase.CreateFolder` / `PrefabUtility.SaveAsPrefabAsset` 创建 Prefab
+  - 未进入 Play Mode
+  - 未直接编辑 `.prefab` YAML
+  - 未直接编辑 `GameScene.unity` YAML
+  - 未修改当前 Scene 中对象
+  - `manage_scene(get_active)` 验证 `GameScene.isDirty=false`
+
+- **Console 状态**：
+  - 存在既有 Error：Unity 以 Administrator 权限运行、MCP WebSocket 历史连接失败
+  - 本次第一次尝试使用 `HideAndDontSave` 临时对象保存 Prefab 失败，Console 留下 `No objects were found for saving into prefab. Have you marked all objects with DontSave?`
+  - 已改用普通临时 GameObject 创建并立即 `DestroyImmediate`，6 个 Prefab 最终创建成功
+  - 未发现脚本编译 Error
+
+- **调用工具**：
+  - `mcp__UnityMCP__batch_execute`：只读预检 sprite / Scene / Console
+  - `mcp__UnityMCP__execute_code`：Editor API 创建 `Assets/Prefabs` 和 6 个 Prefab
+  - `mcp__UnityMCP__manage_asset(get_info)`：验证 Prefab asset 存在
+  - `mcp__UnityMCP__manage_prefabs(get_hierarchy)`：验证 Prefab 结构
+  - `mcp__UnityMCP__manage_scene(get_active)`：确认未 dirty Scene
+  - `apply_patch`：补写 `TASKS.md` 与本日志
+  - **未执行任何 git 操作**
+
+- **结论 / 下一步**：
+  - 第一批 Visual Prefab 已可作为后续 renderer 实例化实验的资产基础
+  - `TASK-029E` 仍未完成：后续若继续，需要单独小任务让 `MonsterRenderer` 引用 `PF_Monster_Slime_Default` 或等价 Slime Prefab，并做 A/B 类验证
+
+---
+
+### 2026-05-30 TASK-033 — 地下迷宫入口布局调整
+
+**阶段：阶段 9 / 地图布局规则调整**
+
+- **任务目标**：
+  - 将入口从旧的左侧入口改为地下迷宫顶部入口房间逻辑
+  - 默认入口位于从上往下第 4 行的中间列
+  - 入口下方固定打开 2-3 格空洞，魔王默认放在入口下方空洞中等待
+  - 从入口下一行开始视为地下土块区域，由 `GridManager` 生成 Soil
+  - 本次不做场景替换、不进 Play Mode、不直接编辑 Scene / Prefab YAML
+
+- **修改内容**：
+  - 修改 `Assets/Scripts/LevelConfig.cs`
+    - 默认 `width` 改为 `60`，对齐首版背景横向 60 格
+    - 新增可配置字段：`entranceRowFromTop`、`entranceColumn`、`openCellsBelowEntrance`、`demonLordCellsBelowEntrance`
+    - `EntrancePosition` / `DemonLordStartPosition` 改为由配置推导，不再在多处写死坐标
+    - `ApplyInitialGrid()` 改为先清空入口上方房间区域，再设置入口、入口下方竖向空洞和魔王所在空洞
+    - 新增 `UsesSurfaceSoilSprite(int y)`，供表现层识别地下表层土
+  - 修改 `Assets/Scripts/GridManager.cs`
+    - 增加魔王起始位置日志
+    - 新增 `UsesSurfaceSoilSprite(int y)` 作为表现层查询入口
+  - 修改 `Assets/Scripts/GridRenderer.cs`
+    - Soil 表层 / 深层 sprite 选择改问 `GridManager` / `LevelConfig`
+    - 移除 `height / 2` 这种临时视觉规则
+  - 更新 `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
+    - 同步当前地图宽度、入口房间、魔王默认放置、地下土块生成规则
+  - 更新 `Assets/AI_DOCS/TASKS.md`
+    - 标记 `TASK-033` 完成
+  - 追加本条 `Assets/AI_DOCS/AI_WORKFLOW_LOG.md` 记录
+
+- **默认推导结果**：
+  - Grid：`60 x 18`
+  - Entrance：`(30, 14)`（第 4 行从顶部数，中间列）
+  - DemonLord：`(30, 11)`（入口下方 3 格）
+  - Underground surface row：`13`
+
+- **A/B 类验证**：
+  - `refresh_unity(force/scripts, compile=request, wait_for_ready=true)` 完成，Unity 曾自动断线重连后恢复 ready
+  - `read_console(types=["error"])`：0 条 Error
+  - `execute_code` 创建临时 `LevelConfig` + `GridData`，验证：
+    - 默认宽度为 60
+    - 入口在中间列，且位于从顶部数第 4 行
+    - 魔王位置与入口同列，位于入口下方 3 格
+    - 入口格为 `Entrance`
+    - 魔王所在格为 `Empty`
+    - 入口上方房间区域为 `Empty`
+    - 入口到魔王之间竖向通道为 `Empty`
+    - 地下表层行仍为 `Soil`
+    - 表层 / 深层 Soil sprite 选择规则正确
+  - `manage_scene(get_active)`：`GameScene.isDirty=false`
+
+- **调用工具**：
+  - `PowerShell Get-Content` / `rg`：只读检查规则和相关脚本
+  - `apply_patch`：修改脚本与 AI_DOCS
+  - `mcp__UnityMCP__refresh_unity`
+  - `mcp__UnityMCP__read_console`
+  - `mcp__UnityMCP__execute_code`
+  - `mcp__UnityMCP__manage_scene(get_active)`
+  - **未执行任何 git 操作**
+
+- **C 类（请手动验证）**：
+  - 进入 Play Mode 后观察 60 格宽地图是否符合上方入口房间 + 下方地下土块布局
+  - 确认入口视觉在顶部第 4 行中间，魔王出现在入口下方空洞中
+  - 确认后续背景图接入时，60 格宽背景与 Grid 横向对齐
+
+---
+
+### 2026-05-30 TASK-034 — 勇者出发延迟与四邻挖掘规则
+
+**阶段：阶段 9 / 游戏流程与挖掘规则调整**
+
+- **任务目标**：
+  - 在当前无 UI 的情况下，让勇者默认等待 10 秒后出发，方便玩家确认开局状态
+  - 挖掘规则改为：目标土块必须上下左右四邻中至少一格为道路（`Empty`）或入口（`Entrance`）才允许挖掘
+  - 暂不做 BFS 连通性检查；因初始空洞必连入口，四邻扩展天然保持道路连通
+
+- **修改内容**：
+  - 修改 `Assets/Scripts/LevelConfig.cs`
+    - 新增 `heroSpawnDelaySeconds = 10f`
+    - 新增 `HeroSpawnDelaySeconds` 只读属性，并将负值夹到 0
+  - 修改 `Assets/Scripts/HeroMover.cs`
+    - 增加 `LevelConfig` 依赖
+    - 生成勇者前按 `LevelConfig.HeroSpawnDelaySeconds` 等待
+  - 修改 `Assets/Scripts/GridManager.cs`
+    - 新增四邻方向表
+    - `IsDiggable(x, y)` 改为：目标必须是 `Soil`，且四邻至少有一个 `Empty` / `Entrance`
+    - `DigCell(x, y)` 改为先调用 `IsDiggable`
+  - 更新 `Assets/AI_DOCS/TASKS.md`
+    - 标记 `TASK-034` 完成
+  - 更新 `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
+    - 记录当前 10 秒出发延迟和四邻挖掘规则
+  - 追加本条 `Assets/AI_DOCS/AI_WORKFLOW_LOG.md` 记录
+
+- **验证状态**：
+  - 已按用户要求停止后续 Unity / 场景验证
+  - 未进入 Play Mode
+  - 未直接编辑 Scene / Prefab YAML
+  - 未执行 git 操作
+  - `refresh_unity` 曾启动但被用户中断；未继续执行 Unity 验证
+
+- **C 类（由用户手动验证）**：
+  - 进入 Play Mode 后确认勇者约 10 秒后生成 / 出发
+  - 确认入口下方现有空洞周围土块可挖
+  - 确认远离已有道路、四邻均为土块的孤立 Soil 不可挖
+  - 确认挖开一格后，可以从新空洞继续向外扩展挖掘
+
+---
+
+### 2026-05-30 TASK-035 — 默认视窗与右键拖动视角
+
+**阶段：阶段 9 / 输入与视窗试验**
+
+- **任务目标**：
+  - 默认游戏视窗调整为约 30 格宽 × 16 格高
+  - 输入规则明确为：鼠标左键敲击 / 挖掘土块；鼠标右键按住拖动视角
+  - 本次不做 UI，不进 Play Mode，不直接编辑 Scene YAML
+
+- **修改内容**：
+  - 修改 `Assets/Scripts/LevelConfig.cs`
+    - 新增 `cameraViewColumns = 30f`
+    - 新增 `cameraViewRows = 16f`
+    - 新增 `CameraStartCenter`，默认以当前 Grid 中心作为相机起点
+  - 修改 `Assets/Scripts/InputHandler.cs`
+    - 启动时按 `LevelConfig.CameraViewRows` 设置正交相机 size
+    - 启动时将相机放到 `LevelConfig.CameraStartCenter`
+    - 保留鼠标左键点击转格子坐标并交给 `DigActionHandler`
+    - 新增鼠标右键按住拖动相机视角
+  - 更新 `Assets/AI_DOCS/TASKS.md`
+    - 标记 `TASK-035` 完成
+  - 更新 `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
+    - 记录当前视窗与输入规则
+  - 追加本条 `Assets/AI_DOCS/AI_WORKFLOW_LOG.md` 记录
+
+- **验证状态**：
+  - 按用户要求，不执行后续场景 / Play Mode 验证
+  - 未执行 git 操作
+  - 未直接编辑 Scene / Prefab YAML
+
+- **C 类（由用户手动验证）**：
+  - 进入 Play Mode 后确认默认视野大约覆盖 30×16 格
+  - 确认左键仍能挖掘合法土块
+  - 确认右键按住拖动可以平移视角
+  - 确认拖动后左键点击仍能命中正确格子
+
+### 2026-05-30 TASK-036 — 地下表层定义为不可破坏的表面层
+
+**阶段：阶段 9 / 挖掘规则补全**
+
+- **任务目标**：
+  - 把"入口下方紧邻的一行"明确为不可破坏 / 不可点击的"表面层"
+  - 视觉概念与玩法规则在同一行重合，统一命名为 `IsSurfaceLayer`
+  - 表面层 hard-no，跳过普通土块的四邻检测逻辑
+
+- **修改内容**：
+  - `Assets/Scripts/LevelConfig.cs`
+    - `UsesSurfaceSoilSprite(int y)` → `IsSurfaceLayer(int y)`（仅改名，语义升级）
+  - `Assets/Scripts/GridManager.cs`
+    - `UsesSurfaceSoilSprite(int y)` → `IsSurfaceLayer(int y)`（代理跟随改名）
+    - `IsDiggable(x, y)`：在 `IsInside` 之后、`CellType.Soil` 之前，增加
+      `if (levelConfig != null && levelConfig.IsSurfaceLayer(y)) return false;`
+      表面层 hard-no，不再走 Soil 类型检查、不走四邻检测
+  - `Assets/Scripts/GridRenderer.cs`
+    - 第 90 行 `gridManager.UsesSurfaceSoilSprite(y)` → `gridManager.IsSurfaceLayer(y)`
+  - `Assets/AI_DOCS/GAME_DESIGN_BASE.md`：补充"地下表层不可破坏"规则段
+  - `Assets/AI_DOCS/TASKS.md`：新增 TASK-036 并标完成
+
+- **A 类验证（AI 已完成）**：
+  - `refresh_unity(force/scripts, compile=request)` → 编译 0 Error
+  - `read_console(error+warning)`：仅 1 条 MCP WebSocket 已知 warning，无新增编译问题
+  - `Grep UsesSurfaceSoilSprite` 在 `Assets/Scripts/**` 全部消除（旧日志内容不动）
+
+- **C 类（由用户手动验证）**：
+  - 进入 Play Mode 后确认：表面层（`UndergroundSurfaceY` 这一行）任意 Soil 点击都不会被挖开
+  - 表面层下一行（`UndergroundSurfaceY - 1`）的 Soil 仍可按四邻规则正常挖掘
+  - 表面层视觉仍使用 `tile_soil_surface_00` sprite，外观无变化
+
+- **未涉及**：
+  - 没有改 `InputHandler` / `DigActionHandler`：表面层点击会被 `DigCell → IsDiggable` 静默拒绝并打 Log，等价于"点不动"，不需要在输入层提前拦截
+  - 没有改 Scene / Prefab
+  - 没有执行 git 操作
+
+- **协作规则更新**：
+  - 用户明确：所有 Play Mode / C 类检测由用户手动完成；AI 不再自动 `manage_editor play`（Unity 背景失焦时 transition 会卡住，本次验证一度卡在 `is_changing=true` 长达 47s，浪费时间）。后续 Unity 任务均按"代码改 + refresh + console 零 error"完成 A 类，剩余交给用户
+
+---
+
+### 2026-05-30 TASK-037 — 怪物生态框架字段预留（生态化重构）
+
+**阶段：阶段 9 / 生态系统骨架**
+
+- **任务目标**：
+  - 把怪物 / 土块 / 挖掘 / 战斗 4 个子系统从"塔防初坯"重构为"地下生态闭环骨架"
+  - 字段全量预留（双资源轴 / Role / MoveStrategy / Carry / Hunger），行为暂只实装 **挖掘资源注入 + 死亡回流** 两段闭环
+  - 大方向稳定，不引入移动 AI / 捕食 / 饥饿消耗 / UI / Debug overlay
+
+- **重构内容**：
+
+  | 文件 | 改动性质 | 关键点 |
+  |---|---|---|
+  | `TileAttributeData.cs` | 重写 | 字段从 `MagicPower` 改为双轴 `Nutrient / Magic`，3 参数构造；加 `HasResource / CanSpawnMonster / WithdrawNutrient / WithdrawMagic / DepositNutrient / DepositMagic` |
+  | `MonsterData.cs` | 重写 | 加 `MonsterEcologyRole` / `MonsterMoveStrategy` enum；新 `MonsterArchetype` plain class + `MonsterArchetypeRegistry` 静态注册表；`MonsterData` 改为 archetype-driven；加 `CurrentNutrient / CurrentMagic / Hunger / AbsorbFromTile(ref TileAttributeData) / Tick()`；`MonsterType` enum 标 `[Obsolete]` 但保留 |
+  | `MonsterIdentity.cs` | 新建 | MonoBehaviour，挂 Prefab Root，字段 `archetypeId : string`，`Resolve()` 查注册表 |
+  | `ResourceFlow.cs` | 新建 | `ResourceFlow.Scatter(origin, n, m, gm, reason)` — chebyshev r=1→2→3 找 Soil 平均分发；都没找到则 `FloatingResourcePool.Deposit`。两个 static 类同文件 |
+  | `MonsterManager.cs` | 改 | 通用 `PlaceMonster(int, int, MonsterArchetype)`；`PlaceSlime` 改为薄包装 `PlaceMonster(Slime)` |
+  | `DigActionHandler.cs` | 改 | `DigSoilCell` 重写：读 attr → DigCell → 若可生成则 PlaceMonster + AbsorbFromTile → `attr.ElementType = None` → 剩余资源调 `ResourceFlow.Scatter("dig-leftover")`。**不再** `SetTileAttribute(Default)` |
+  | `CombatSystem.cs` | 改 | Start 中新增 `gridManager` 字段；怪物死亡分支在 `RemoveMonster` 前调 `ResourceFlow.Scatter(gridPos, carriedN, carriedM, gridManager, "death:...")` |
+  | `GridManager.cs` | 改 | `GetTileAttribute / SetTileAttribute` 加 Soil 守卫：非 Soil 读返回 `Default`、写打 Warning 并拒绝 |
+  | `LevelConfig.cs` | 改 | `testSlimeAttributePositions` 初始化改用 3 参数构造 `new TileAttributeData(3, 0, TileElementType.Slime)` |
+  | `PF_Monster_Slime_Default.prefab` | 加组件 | Root 上挂 `MonsterIdentity`，`archetypeId = "slime"`（默认值） |
+
+- **数值（首版生态闭环 demo 用）**：
+
+  | 项 | 值 |
+  |---|---|
+  | `MonsterArchetype.Slime.NutrientCapacity` | 5 |
+  | `MonsterArchetype.Slime.MagicCapacity` | 0（养分系生物） |
+  | `MonsterArchetype.Slime.BaseMaxHP / BaseAttack / AttackRange` | 10 / 2 / 1.0 |
+  | `MonsterArchetype.Slime.HungerMax` | 10（字段预留，无消耗） |
+  | testSlime tile 初始 `Nutrient / Magic` | 3 / 0 |
+  | 挖测试 tile 预期 | Slime 吸 3 N，tile 剩 0 → 无扩散 |
+  | 战斗 Slime 死亡预期 | 3 N 通过 `ResourceFlow.Scatter` 回流到死亡格周围 Soil |
+
+- **设计原则（用户明确）**：
+  - F1 `MonsterType` 弱化而非强删；首轮重构后 0 live reference，仅 enum 声明保留 + `[Obsolete]`
+  - F2 `MagicPower` 直接改名为 `Magic`
+  - F3 Empty / Entrance tile **不能**作为资源容器；只有 Soil 接收读写
+  - F4 死亡回流目标是死亡格**周围**的 Soil；周围没有则扩大半径，仍没有则进游离资源池
+  - F5 `NutrientCapacity / MagicCapacity` 和 `CurrentNutrient / CurrentMagic` 必须拆 4 个独立字段
+  - F6 Slime 属养分系，`MagicCapacity = 0`；后续怪物数值由配置表决定
+  - F7 `MonsterIdentity` 挂 Prefab Root，连接 Prefab ↔ archetype
+  - F8 当前 plain class + 静态配置表；稳定后再迁 ScriptableObject
+
+- **预留但不实装**：
+  - 移动 AI（`MoveStrategy` 仅字段）
+  - 饥饿消耗（`Hunger` 仅字段，`Tick()` 为 no-op）
+  - Monster vs Monster / 捕食判定
+  - Debug overlay / 资源可视化
+  - `FloatingResourcePool` 的回灌策略（当前仅 Deposit + 累计）
+
+- **A 类验证（AI 已完成）**：
+  - `refresh_unity(force/scripts)` 首次因为新文件 `.meta` 未生成有 `CS0103: ResourceFlow does not exist` 报错；改 `refresh_unity(force/all)` 后 .meta 生成，编译 0 Error
+  - Console 仅剩 1 条 MCP WebSocket 已知 warning
+  - Prefab 验证：`execute_code` 用 `PrefabUtility.LoadPrefabContents / AddComponent / SaveAsPrefabAsset` 完成 `MonsterIdentity` 挂载；reload 后 `verify_archetypeId = "slime"` ✓（注：verify 返回的 `verify_hasComponent` 字段因 Unity 跨 `LoadPrefabContents` 边界对 MonoBehaviour null 检查不稳，以 `ArchetypeId` 值为准）
+
+- **C 类（由用户手动验证）**：
+  - 进 Play Mode 挖一个 testSlime 位置（`(24,9)` 等），Console 应出现 `[Resource] Dig(...): tile→Slime N=3 M=0; tile remaining N=0 M=0`
+  - 让 Hero 击败一只携带资源的 Slime，Console 应出现 `[Resource] Death@(x,y): Slime drops N=3 M=0` + `[Resource] Scatter origin=... r=1 → N Soil cells; N=3 M=0`
+  - 验证：死亡格周围 Soil 的 Nutrient 数值应增加（可在 Inspector 看 GridData 或后续 Debug overlay）
+  - 验证：尝试在 Empty 格调 `SetTileAttribute` 应被 GridManager 拒绝并打 Warning
+
+- **未涉及 / 未做**：
+  - 场景无改动（Sprites / Renderer / 现有 GameObject 不变）
+  - 没有改 `MonsterRenderer`（Prefab 实例化模式切换留给 TASK-029E）
+  - 没有 git 操作
+  - 没改 `GAME_DESIGN_BASE.md` 第 127-142 行的"旧规则记录 (TASK-026)" 段（属历史档案，保留）
+
+- **当时的后续方向（历史建议，编号已失效）**：
+  - Slime 最小移动策略（`Static → RandomWalk`，验证 MoveStrategy 字段接通）
+  - Hunger 消耗 + 饥饿死亡（验证 `Tick()` 接通生态压力）
+  - Monster vs Monster 最小捕食（Predator role 吃 Carrier，资源转移到捕食者）
+  - `MonsterRenderer` 改为实例化 `PF_Monster_Slime_Default`，通过 `MonsterIdentity.Resolve()` 反查 archetype
+
+---
+
+### 2026-05-30 TASK-038 — 勇者出发前魔王重新放置流程
+
+**阶段：阶段 9 / 开局流程门控**
+
+- **任务目标**：
+  - 魔王开局即存在并显示在默认位置
+  - 倒计时结束时不立刻生成勇者，而是进入“抓起当前魔王并等待重新放置”流程
+  - 玩家左键点击任意 `Empty` 格完成魔王转移
+  - 魔王重新放置成功后，勇者、怪物等流程继续推进
+  - 这里不是 Unity 引擎暂停，也不改 `Time.timeScale`
+
+- **修改内容**：
+  - `Assets/Scripts/DemonLordManager.cs`
+    - 新增 `IsPlaced` / `IsRepositioning`，并保留 `IsWaitingForPlacement` 作为输入层查询入口
+    - 新增 `RequestReposition()`
+    - 新增 `TryPlaceAt(Vector2Int, GridManager)`：只允许在 `Empty` 格放置魔王
+    - 默认位置由 `LevelConfig.DemonLordStartPosition` 准备，开局即视为已放置
+  - `Assets/Scripts/DemonLordRenderer.cs`
+    - Start 时创建初始魔王显示，保证魔王开局存在
+    - 新增 `MoveDemonLordViewTo(Vector2Int)`，重新放置成功后移动魔王显示
+  - `Assets/Scripts\InputHandler.cs`
+    - 增加 `GridManager` / `DemonLordManager` / `DemonLordRenderer` 引用
+    - 左键点击时，如果正在等待魔王放置，则优先尝试放置魔王
+    - 放置失败时吞掉本次点击，不继续挖土
+    - 右键拖动视角逻辑不变
+  - `Assets/Scripts/HeroMover.cs`
+    - 10 秒倒计时结束后调用 `DemonLordManager.RequestReposition()`
+    - 等待 `DemonLordManager.IsPlaced == true` 后才 `SpawnHeroAtEntrance()`
+  - `Assets/AI_DOCS/TASKS.md`
+    - 标记 `TASK-038` 完成
+  - `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
+    - 同步记录倒计时后魔王放置流程
+
+- **验证状态**：
+  - 按用户要求，不执行 Play Mode / 场景验证
+  - 未执行 git 操作
+  - 未直接编辑 Scene / Prefab YAML
+
+- **修正记录**：
+  - 第一版曾把流程写成“魔王倒计时后才出现”；用户指出魔王开局应存在
+  - 已修正为“魔王开局存在，倒计时后进入抓取 / 转移状态”
+
+- **C 类（由用户手动验证）**：
+  - 进入 Play Mode 后确认魔王开局就在默认位置显示
+  - 等待 10 秒后确认勇者不会立刻出现，而是进入魔王转移状态
+  - 左键点击任意 `Empty` 格，确认魔王移动到该格
+  - 点击 Soil / Entrance / 地图外时魔王不应放置，且该次点击不应挖土
+  - 魔王放置成功后，确认勇者从入口生成并开始行动
+
+---
+
+### 2026-05-31 TASK-041 — 16:9 gameplay viewport 规则固化
+
+**阶段：阶段 9 / 视窗规则定型**
+
+> **编号说明**：用户在指令中将本任务命名为 "TASK-040"，但 TASK-040 已被"捕食资源转移 API"占用；本条改用下一个空编号 TASK-041 落档，不冲突。
+
+- **任务目标（用户原话）**：
+  - 项目默认保持 16:9 gameplay viewport，参考 PSP 版局部视野
+  - 目标视野：约 28×16 格土块（可接受 27–30 × 16–18）
+  - 1 土块 = 1 Unity Unit；Orthographic Size 参考 ≈ 8
+  - 检查当前 Camera 设置 / 可见格数；如果接近不要改 Camera；如果偏离只提建议
+  - 将规则记录到 `GAME_DESIGN_BASE.md` / `AI_WORKFLOW_LOG.md` / `TASKS.md`
+
+- **当前实测**：
+
+  | 项 | 实测 | 说明 |
+  |---|---|---|
+  | `Camera.orthographic` | true | ✓ |
+  | Camera Inspector `orthographicSize` | **9.0** | TASK-002 留的旧值 |
+  | 运行时 ortho size（`InputHandler.ApplyInitialCameraView` 覆盖） | **8.0** | 由 `LevelConfig.CameraViewRows × 0.5` 推得，**符合目标** |
+  | Game View `aspect`（实测） | **2.24** | ≈ 21:9 超宽屏，**偏离 16:9 = 1.78** |
+  | Game View 像素尺寸 | 929 × 415 | 编辑器面板当前宽度 |
+  | `LevelConfig.CameraViewRows` | 16 | ✓ |
+  | `LevelConfig.CameraViewColumns` | 30 | **代码未读取**，仅文档语义；建议未来对齐 28 或删除 |
+
+- **可见格数估算**：
+
+  | 场景 | 行 | 列 | 是否符合 27–30 × 16–18 |
+  |---|---|---|---|
+  | Edit Mode（Inspector 直读：ortho=9, aspect=2.24） | 18 | 40 | ❌ 横向超 ~33% |
+  | Play Mode + 当前 aspect（ortho=8, aspect=2.24） | 16 | ~36 | ❌ 横向超 ~25% |
+  | **Play Mode + 16:9 aspect（ortho=8）** | **16** | **28.4** | ✅ 命中目标中段 |
+
+- **结论**：
+  - **代码端设计意图（ortho=8 + 28×16 视窗）已对齐**。`LevelConfig.CameraViewRows=16` + `InputHandler.ApplyInitialCameraView` 推导无偏差
+  - **唯一偏离**：Unity Game View 面板顶部 Aspect 下拉框当前未锁定 16:9，导致实际可见列数受面板拉伸影响
+  - Camera Inspector ortho=9 是 TASK-002 残值，运行时被覆盖为 8，**无害**
+
+- **建议（不强制 / 未执行）**：
+  1. 编辑器 Game View 面板顶部 Aspect 下拉框选 **"16:9 Aspect"**（编辑器视图设置，无需改代码）
+  2. （可选）Main Camera Inspector `orthographicSize` 手动改为 8，让 Edit Mode 也匹配
+  3. （可选）`LevelConfig.CameraViewColumns=30` 字段当前未被任何代码读取；要么删除，要么对齐到 28 让文档语义自洽
+
+- **本任务执行内容**：
+  - **未改任何代码**（按用户约束）
+  - **未改 Camera**（设计意图已接近）
+  - **未执行 git 操作**
+  - 只更新了 `GAME_DESIGN_BASE.md` 视窗段 / `TASKS.md` 新增 TASK-041 / `AI_WORKFLOW_LOG.md` 本条
+
+- **A 类验证**：
+  - `read_console(error+warning)`：0 条
+  - Camera + LevelConfig + 运行时推导值通过 `execute_code` 读取确认
+
+- **C 类（由用户手动确认）**：
+  - 在 Unity Game View 面板顶部 Aspect 下拉选 "16:9 Aspect"，进 Play Mode 应看到约 28 列 × 16 行
+  - 若未来某些 task 需要扩展视野规则，应基于本 16:9 + 28×16 基准展开，不应直接放大
+
+---
+
+### 2026-05-31 TASK-042 — 美术资源批量接入（97 张，新增 4 类别 + 规则扩充）
+
+**阶段：阶段 9 / 美术资产正式入库**
+
+- **任务目标（用户原话浓缩）**：
+  - 扫描 `D:\Game Developer Tools\Game Art Drops\MyLord\` 下 9 个粗分类目录
+  - 按现有 `ART_INTAKE_RULES` / `ART_NAMING_RULES` 整理入库
+  - 新类别（Buildings / SurfaceObjects / Vegetation / Entrances）建独立目录 + 规则增补
+  - 旧 `tile_entrance_default_00.png` 与 `PF_Environment_Entrance_Default.prefab` 删除（入口将重做）
+  - 24 张泛数字命名走"程序化生成池"简化命名（`<prefix>_<index>` 省略 `<name>`）
+  - Tile 4 色 = Soil variant，类型统一 `soil`
+
+- **外部目录扫描**：
+
+  | 源目录 | 文件数 | 备注 |
+  |---|---|---|
+  | Backgrounds | 1 | `background_01.png` 3360×480 ✓ 与规格对齐 |
+  | Buildings | 3 | 泛数字命名 |
+  | Effects | 0 | 空（不报错，按要求只记录） |
+  | Entrances | 5 | 多格大尺寸 224×224 / 168×168 |
+  | Props | 11 | 64×64 全部，泛数字命名 |
+  | SurfaceObjects | 8 | tree01(×5 动画帧) / tree02 / tree03 / watchower(typo) |
+  | Tiles | 64 | 4 色 × 16 张，48×48 全部 |
+  | UI | 0 | 空 |
+  | Vegetation | 5 | 64×64，泛数字命名 |
+  | **合计** | **97** | |
+
+- **规则文档增补**：
+  - `ART_INTAKE_RULES.md`
+    - § 一目录树补 `Entrances/` / `SurfaceObjects/` / `Buildings/` / `Vegetation/`
+    - § 四 Import Setting 重写：统一像素风规则（PPU=48 / Point / Uncompressed / no mipmap / alpha-is-transparency / wrap-clamp），新增按类别的 Pivot + maxTextureSize 表（Tiles=Center / Surface 类 = BottomCenter / Backgrounds maxTex=4096）
+  - `ART_NAMING_RULES.md`
+    - § 一加"程序化生成批次的命名简化"段：允许 `<prefix>_<index>` 省略 `<name>`，需在批次日志备注
+    - § 二补 `entrance_<index>` / `building_<index>` / `surface_<name>_<state>_<index>` / `veg_<index>` 模板
+    - § 三更新：旧 `tile_entrance_*` 已废弃（入口升级为多格独立类别）；Soil variant 新增颜色主题集示例（brown / dark_blue / dark_green / dark_purple_red × 16）
+    - § 七去掉对应未涵盖项
+
+- **命名映射（全 97 张）**：
+
+  | 源 | 目标 | Unity 路径 | Pivot |
+  |---|---|---|---|
+  | `Backgrounds/background_01.png` | `bg_overworld_00.png` | `Art/Backgrounds/` | Center |
+  | `Buildings/{1..3}.png` | `building_00..02.png` | `Art/Buildings/`（新） | BottomCenter |
+  | `Entrances/{1..5}.png` | `entrance_00..04.png` | `Art/Entrances/`（新） | BottomCenter |
+  | `Props/{1..11}.png` | `prop_00..10.png` | `Art/Props/` | BottomCenter |
+  | `SurfaceObjects/tree01/untitled_0001..05.png` | `surface_tree_a_idle_00..04.png` | `Art/SurfaceObjects/`（新） | BottomCenter |
+  | `SurfaceObjects/tree02/fantasy_old_tree1.png` | `surface_tree_b_00.png` | 同上 | BottomCenter |
+  | `SurfaceObjects/tree03/unknown.png` | `surface_tree_c_00.png` | 同上 | BottomCenter |
+  | `SurfaceObjects/watchower/unknown.png` | `surface_watchtower_00.png`（typo 修正） | 同上 | BottomCenter |
+  | `Tiles/<color>/tile_<color>_<01..16>.png` | `tile_soil_<color>_<00..15>.png` × 4 色 | `Art/Tiles/` | Center |
+  | `Vegetation/{1..5}.png` | `veg_00..04.png` | `Art/Vegetation/`（新） | BottomCenter |
+
+- **同步删除（用户明确授权）**：
+  - `Assets/Art/Tiles/tile_entrance_default_00.png` + `.meta`
+  - `Assets/Prefabs/PF_Environment_Entrance_Default.prefab` + `.meta`
+  - 影响：`GridRenderer.spriteEntrance`（Scene 字段）变 missing；代码已有 `!= null ? sprite : _whitePlaceholder` 降级，**编译/运行不会断**，Entrance 格回退到 `ColorEntrance` fallback 色直到入口系统重做
+
+- **导入流程**：
+  1. PowerShell/Bash `cp` 97 张以规范英文名复制到 `Assets/Art/_Incoming/`
+  2. `refresh_unity(force/all)` 让 Unity 自动 import（生成 .meta + GUID 锁定）
+  3. `execute_code` 单次 mega-batch：对 97 张应用 `TextureImporter` API（PPU=48 / Point / Uncompressed / no mipmap / alpha-is-transparency / wrap-clamp / 按类别 pivot + maxTexSize），随后 `AssetDatabase.MoveAsset` 移到目标目录
+  4. 验证 + Console 检查
+
+- **A 类验证（AI 已完成）**：
+
+  | 项 | 实测 |
+  |---|---|
+  | 总 import 成功 | **97 / 97**，0 failure |
+  | Backgrounds 最终尺寸 | 3360 × 480 ✓（maxTexSize=4096 生效，未被默认 2048 截） |
+  | Backgrounds Pivot | Center ✓ |
+  | Tile 样本 PPU / Filter / Pivot | 48 / Point / Center ✓ |
+  | Prop 样本 PPU / Filter / Pivot | 48 / Point / BottomCenter ✓ |
+  | `Art/Tiles/` 总文件数 | 66（64 新 + `tile_soil_surface_00` + `tile_soil_deep_00`） |
+  | `Art/Backgrounds/` 文件数 | 1 ✓ |
+  | `Art/Buildings/` 文件数 | 3 ✓ |
+  | `Art/Entrances/` 文件数 | 5 ✓ |
+  | `Art/Props/` 文件数 | 11 ✓ |
+  | `Art/SurfaceObjects/` 文件数 | 8 ✓ |
+  | `Art/Vegetation/` 文件数 | 5 ✓ |
+  | `_Incoming/` 残留 | 只剩 `.gitkeep` ✓ |
+  | Console error / warning | **0 / 0** |
+
+- **未做 / 不在本任务范围**：
+  - 未修改任何 `.cs` 代码（`GridRenderer.spriteEntrance` null 降级由原有代码处理）
+  - 未修改 Scene 中任何 GameObject / Component
+  - 未生成 Prefab / ScriptableObject / Manifest（规则未要求）
+  - 未碰任何渲染逻辑（renderer 改造 / sprite 接入留给后续 task）
+  - 未执行 git 操作
+
+- **C 类（由用户手动审查）**：
+  - 在 Unity Project 窗口检查各类别目录文件是否齐全 + 视觉缩略图是否正常
+  - 入口格 `CellType.Entrance` 在 Play Mode 现在会回退到 `ColorEntrance` fallback 色（绿色块），等入口系统重做时一并修复
+  - 程序化生成池命名（`prop_00..10` 等）后续需要时可批量 rename 为有语义名
+  - SurfaceObjects/tree_a 5 帧未来挂 AnimationClip 时按 `_idle_00..04` 自动识别
+  - 4 色 Soil 主题集（共 64 张）目前没有 renderer 使用；接入逻辑（按 grid 位置 / 主题 / 随机）属下一轮任务
+
+- **后续建议任务**：
+  - TASK-043 — 入口系统重做：新 `EntranceManager` / `EntranceRenderer`，多格大尺寸 sprite 实例化；新勇者出生流程
+  - TASK-044 — Soil 主题集接入：`GridRenderer` 按 grid 位置 / 主题选用 `tile_soil_<color>_<index>`
+  - TASK-045 — 地表层渲染：在地图顶部 10 行铺 `bg_overworld_00` + Surface/Building/Vegetation 程序化散布
+  - TASK-046 — 地图尺寸正式扩到 70×50（背景已就位，可配套放大 LevelConfig）
+
+---
+
+### 2026-05-31 TASK-043 — 新增 SURFACE_DECORATION_RULES.md（规则only，不实现）
+
+**阶段：阶段 9 / 地表背景设计规则定型**
+
+- **任务目标（用户原话浓缩）**：
+  - 大背景底图只负责天空 / 远景；单体素材由 AI 生成并按类别导入
+  - 不再死拼背景；用区域权重半程序化在 Unity 内摆放
+  - 程序化结果只作为草稿，人工微调权归用户
+  - 本轮以规则制定为主，**不要实现完整功能**
+
+- **修改内容**：
+  - **新建** `Assets/AI_DOCS/SURFACE_DECORATION_RULES.md`：11 节 / 约 200 行
+    - 区域划分 Zone A–E（半开区间 `[0,14)` `[14,27)` `[27,41)` `[41,55)` `[55,70)`，合计 14+13+14+14+15 = 70 ✓）
+    - 类别 × Zone 权重表（H / M / L / ✗）
+    - 4 层 BG sortingOrder（`BG_Base=-100 / BackDeco=-80 / MidDeco=-60 / FrontDeco=-40 / Gameplay≥-10`）
+    - 占位宽度参考表（按物件类别）
+    - 第一版 10 点生成目标
+    - 后续抽象（`SurfaceDecorationProfile` / `DecorationPlacementData` / `SurfaceDecorationSpawner` / 随机种子）
+    - 明确"AI 边界"：不细分小物件美感判断 / 不引入美学评分 / 用户保留全部人工调整权
+  - `TASKS.md`：标 TASK-043 完成 + 新增 TASK-044 ~ TASK-050 占位（不实现）
+
+- **未做**：未改任何代码 / Scene / Prefab / 美术资产；未生成任何 ScriptableObject 或运行时对象
+
+- **A 类验证**：文档已写入；Console 0 error；规则与 `ART_INTAKE_RULES § 一` 目录（TASK-042 新增的 4 类别）/ `ART_NAMING_RULES § 二` 前缀模板对齐
+
+- **下一步任务（已占位入 TASKS.md，等用户启动）**：
+  - TASK-044 `SurfaceDecorationProfile`
+  - TASK-045 `DecorationPlacementData` + `SurfaceDecorationSpawner`
+  - TASK-046 `BackgroundLayerRenderer`（4 层 BG + bg_overworld_00 铺底）
+  - TASK-047 地图扩 70×50（`LevelConfig`）
+  - TASK-048 入口系统重做（衔接 TASK-038 流程）
+  - TASK-049 Soil 主题集接入（`GridRenderer`）
+  - TASK-050 草稿持久化（可选）
+
+---
+
 *后续每个 Task 完成后在此追加记录。*
+*编号维护说明：本日志中个别旧“后续建议任务”编号属于当时的占位草案；如果与后续正式任务编号冲突，以 `TASKS.md` 为当前真相源。*
+
+---
+
+### 2026-05-30 TASK-039 — 生态资源流适用范围固化
+
+**阶段：阶段 9 / 生态资源流规则固化**
+
+- **任务目标**：
+  - 在 TASK-037 的生态字段骨架基础上，防止后续把所有 `HP <= 0` 都误接到 `ResourceFlow.Scatter`
+  - 区分挖掘残余资源散布、普通非捕食死亡回流、捕食、生命周期转化等不同资源流向
+  - 本轮不实现史莱姆生命周期、咬咬虫、蘑菇、完整生态 AI，也不做大规模重构
+
+- **修改内容**：
+  - `Assets/Scripts/ResourceFlow.cs`
+    - 新增 `DeathCause`：`HeroKill / PredatorEat / NaturalDecay / Starvation / LifecycleTransform / LifecycleWither / EnvironmentDeath / Unknown`
+    - 新增 `ScatterDigLeftoverResources(...)`，专用于 Soil 被挖成 Empty 后的残余资源散布
+    - 新增 `ScatterOrdinaryDeathResources(...)`，专用于普通非捕食死亡资源散布
+    - 新增 `AllowsOrdinaryDeathScatter(...)`，当前仅允许 `HeroKill` 与 `EnvironmentDeath`
+    - 保留旧 `Scatter(...)` 作为兼容入口，并标记 `[Obsolete]`
+  - `Assets/Scripts/CombatSystem.cs`
+    - 勇者击杀怪物时改为调用 `ScatterOrdinaryDeathResources(..., DeathCause.HeroKill, ...)`
+    - 不再直接调用通用 `ResourceFlow.Scatter`
+  - `Assets/Scripts/DigActionHandler.cs`
+    - 挖掘残余资源改为调用 `ScatterDigLeftoverResources(...)`
+  - `Assets/Scripts/MonsterData.cs`
+    - 更新携带资源注释，明确资源由原因相关的 resource flow 结算
+  - `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
+    - 记录 `DeathCause`、普通死亡回流适用范围、禁止将捕食 / 生命周期 / 自然衰弱默认接入死亡散布
+  - `Assets/AI_DOCS/TASKS.md`
+    - 追加并标记 `TASK-039` 完成
+
+- **规则固化结果**：
+  - `HeroKill` / `EnvironmentDeath`：可走普通死亡散布到周围 Soil
+  - `PredatorEat`：不得走普通死亡散布，后续应进入捕食者资源转移
+  - `NaturalDecay` / `Starvation`：暂不默认散布，等待生命周期 / 饥饿策略
+  - `LifecycleTransform` / `LifecycleWither`：不得走普通死亡散布
+  - `Unknown`：保守处理，不默认散布
+
+- **验证状态**：
+  - `refresh_unity(force/scripts, compile=request, wait_for_ready=true)` 完成，Unity 曾断线重连后恢复 ready
+  - `read_console(error+warning)`：无脚本 Error；仅保留既有 MCP WebSocket warning：`WebSocket is not initialised`
+  - 未进入 Play Mode
+  - 未修改 Scene / Prefab / ProjectSettings / Assets/Settings
+  - 未执行任何 git 操作
+
+- **C 类（由用户手动验证）**：
+  - Play Mode 中勇者击杀携带资源的 Slime，资源仍应按普通死亡回流到周围 Soil
+  - 挖掘带残余资源的 Soil，残余资源仍应散布到周围 Soil 或进入 FloatingResourcePool
+  - 后续实现捕食 / 生命周期时，确认不会复用 `HeroKill` 死亡回流路径
+
+---
+
+### 2026-05-31 TASK-040 — 捕食资源转移 API
+
+**阶段：阶段 9 / 生态资源流最小能力补齐**
+
+- **任务目标**：
+  - 承接 TASK-037 / TASK-039 的生态资源规则
+  - 只补齐 `Prey Monster → Predator Monster` 的资源转移能力
+  - 不实现咬咬虫 AI、史莱姆生命周期、花苞、蘑菇，也不做资源流系统重构
+
+- **修改内容**：
+  - `Assets/Scripts/MonsterData.cs`
+    - 新增 `WithdrawNutrient(int request)` / `WithdrawMagic(int request)`
+    - 新增 `ReceiveNutrient(int amount)` / `ReceiveMagic(int amount)`
+    - 接收方法按 `NutrientCapacity / MagicCapacity` 剩余容量吸收，并返回装不下的剩余量
+  - `Assets/Scripts/ResourceFlow.cs`
+    - 新增 `TransferResourcesToPredator(MonsterData prey, MonsterData predator, string reason)`
+    - 猎物携带资源先被抽出，捕食者按容量接收
+    - 捕食者装不下的资源进入 `FloatingResourcePool`
+    - 不调用 `ScatterOrdinaryDeathResources`
+  - `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
+    - 记录捕食资源转移 API 与溢出处理规则
+  - `Assets/AI_DOCS/TASKS.md`
+    - 追加并标记 `TASK-040` 完成
+
+- **验证状态**：
+  - `refresh_unity(force/scripts, compile=request, wait_for_ready=true)` 完成，Unity 曾断线重连后恢复 ready
+  - `read_console(error+warning)`：无脚本 Error；仅保留既有 MCP WebSocket warning：`WebSocket is not initialised`
+  - `execute_code` 纯内存验证：
+    - prey 初始携带 N=5 / M=3
+    - predator 原有 N=2 / M=0，容量 N=4 / M=1
+    - 转移后 prey N=0 / M=0
+    - predator N=4 / M=1
+    - overflow 进入 FloatingResourcePool：N=3 / M=2
+    - `AllowsOrdinaryDeathScatter(DeathCause.PredatorEat) == False`
+  - 未进入 Play Mode
+  - 未修改 Scene / Prefab / ProjectSettings / Assets/Settings
+  - 未执行任何 git 操作
+
+- **C 类（由用户手动验证）**：
+  - 后续接入咬咬虫捕食时，确认捕食行为调用 `TransferResourcesToPredator`
+  - 确认捕食后猎物移除路径不再调用普通死亡回流
+  - 确认溢出资源不会写入 Empty Tile
+
+---
+
+### 2026-05-31 TASK-044 — SurfaceDecorationProfile 数据载体（补充归档）
+
+- **任务目标**：
+  - 将 `SURFACE_DECORATION_RULES.md` 中的 Zone、权重、素材池和默认 footprint 收敛成 plain class 数据载体
+  - 不引入摆放逻辑，不实例化对象，不写 Scene
+
+- **实际完成内容**：
+  - 新建 `Assets/Scripts/SurfaceDecorationProfile.cs`
+  - 新增 `DecorationCategory` / `DecorationZone` / `ZoneBounds`
+  - `CreateDefault()` 已承载：
+    - `SurfaceWidth=70`
+    - `SurfaceHeight=10`
+    - `EntranceCenterX=34`
+    - 5 个 Zone 边界：`[0,14) / [14,27) / [27,41) / [41,55) / [55,70)`
+    - 6 类别 × 5 Zone 权重矩阵
+    - Background / Entrance / SurfaceObject / Building / Prop / Vegetation 的 sprite 路径池
+    - 类别默认 footprint 回退表
+  - 提供查询接口：
+    - `GetWeight(...)`
+    - `GetSpritesIn(...)`
+    - `GetFootprintWidth(...)`
+    - `GetZoneAt(...)`
+
+- **边界说明**：
+  - 纯数据类
+  - 无 Scene / Prefab / 运行时副作用
+  - 不包含 spawner 与 renderer
+
+- **状态校正说明**：
+  - 该任务代码已完成，但此前未独立写完整日志
+  - 本条用于把 TASK-044 与后续 TASK-045 的实际边界补齐
+
+---
+
+### 2026-05-31 TASK-045 — DecorationPlacementData + SurfaceDecorationSpawner
+
+- **任务目标**：
+  - 在不写 Scene 文件的前提下，补齐第一版地表装饰草稿生成能力
+  - 支持随机种子、草稿生成、清空、重生
+  - 只输出 placement data，不做实例化
+
+- **实际完成内容**：
+  - 新建 `Assets/Scripts/DecorationPlacementData.cs`
+    - 定义 `SpritePath / Category / Zone / X / FootprintWidth / SortingOrder`
+    - 提供 `RightX / CenterX`
+    - 新增 `DecorationSortingLayer.ResolveByCategory(...)`
+  - 新建 `Assets/Scripts/SurfaceDecorationSpawner.cs`
+    - 提供 `RandomSeed / CurrentDraft / Profile`
+    - 提供 `ClearDraft()` / `GenerateDraft()` / `RegenerateDraft()`
+    - 生成顺序对齐规则文档：
+      - Zone C 固定入口
+      - Zone A 自然地标
+      - Zone E 收尾地标
+      - Zone B / D 建筑
+      - Zone C 入口周边 Props / Vegetation
+      - 全图 sprinkle Props / Vegetation
+    - 仅限制“同层 footprint 不重叠”
+    - 跨层允许重叠
+    - 不实例化 GameObject
+    - 不保存 Scene
+
+- **A 类验证（本轮已完成）**：
+  - `refresh_unity(scope=scripts, compile=request, wait_for_ready=true)` 成功
+  - `read_console(error+warning)`：无脚本 Error；仅保留既有 MCP WebSocket warning
+  - `execute_code` 验证通过：
+    - 可成功生成草稿（样本数量 27~28 条）
+    - 必含 1 条 Entrance
+    - 所有条目 Zone 归属正确
+    - 所有 SortingOrder 低于 Gameplay 层
+    - 同层 footprint 无重叠
+    - `ClearDraft()` 后数量归零
+    - 固定 `RandomSeed=12345` 时，`GenerateDraft()` 与 `RegenerateDraft()` 结果稳定一致
+  - 未进入 Play Mode
+  - 未修改 Scene / Prefab / ProjectSettings / Assets/Settings
+  - 未执行任何 git 操作
+
+- **边界说明**：
+  - 当前仅完成“草稿数据生成”
+  - 实例化与分层渲染仍留给 TASK-046 `BackgroundLayerRenderer`
+
+---
+
+### 2026-05-31 TASK-046 — BackgroundLayerRenderer
+
+- **任务目标**：
+  - 将 `SurfaceDecorationSpawner` 输出的草稿按背景层真实实例化
+  - 接入 4 层 BG（`BG_Base / BG_BackDeco / BG_MidDeco / BG_FrontDeco`）
+  - 用 `bg_overworld_00` 铺底
+  - 不保存 Scene，不进入 Play Mode
+
+- **实际完成内容**：
+  - 新建 `Assets/Scripts/BackgroundLayerRenderer.cs`
+  - 提供：
+    - `RebuildLayers()`
+    - `ClearLayers()`
+  - 自动查找：
+    - `SurfaceDecorationSpawner`
+    - `LevelConfig`
+  - 生成功能：
+    - `BG_Base` 层实例化 `bg_overworld_00`
+    - 将 spawner 的 `DecorationPlacementData` 按 `SortingOrder` 分发到对应 layer root
+    - 生成 `BG_Base / BG_BackDeco / BG_MidDeco / BG_FrontDeco` 4 个容器
+    - 通过 `AssetDatabase.LoadAssetAtPath<Sprite>` 读取导入后的 sprite
+  - 稳定性修补：
+    - `SurfaceDecorationSpawner` 新增 `EnsureInitialized()`，避免在即时工具验证路径下 `Awake` 尚未触发时出现空引用
+    - `BackgroundLayerRenderer` 不再假定 `CurrentDraft` 一定已初始化
+
+- **A / B 类验证（本轮已完成）**：
+  - `validate_script(BackgroundLayerRenderer.cs)`：0 error / 0 warning
+  - `refresh_unity(...wait_for_ready=true)` 成功
+  - `read_console(error+warning)`：无脚本 Error；仅保留既有 MCP WebSocket warning
+  - `execute_code` 临时创建验证对象并调用 `RebuildLayers()`：
+    - `draftCount = 22`
+    - `totalSprites = 23`
+    - `BG_Base = 1`
+    - `BG_BackDeco = 0`
+    - `BG_MidDeco = 5`
+    - `BG_FrontDeco = 17`
+    - `totalSprites == draftCount + 1` 成立（草稿对象 + 1 张底图）
+  - 验证对象已在同次 `execute_code` 中立即销毁
+  - 未进入 Play Mode
+  - 未修改 Scene / Prefab / ProjectSettings / Assets/Settings
+  - 未执行任何 git 操作
+
+- **边界说明**：
+  - 本轮只完成实例化与分层，不扩地图尺寸
+  - 不与入口系统重做联动
+  - 不处理 Soil 主题随机渲染
+
+---
+
+### 2026-05-31 TASK-047 — 地图尺寸扩到 70×50
+
+- **任务目标**：
+  - 将 `LevelConfig` 默认地图尺寸从测试期 `60x18` 切换到正式地表联动尺寸 `70x50`
+  - 让入口、魔王初始位置、相机初始中心和背景层实例化在当前测试场景中对齐新尺寸
+  - 不修改地图核心逻辑，不进入 Play Mode
+
+- **实际完成内容**：
+  - 修改 `Assets/Scripts/LevelConfig.cs`
+    - `width: 60 -> 70`
+    - `height: 18 -> 50`
+  - 修改 `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
+    - 当前测试网格尺寸描述改为 `70 列 × 50 行`
+  - 编辑器态场景内重建（未保存 Scene）：
+    - 将当前场景中的 `LevelConfig` 同步设为 `70x50`
+    - 清除旧 `GridTiles`
+    - 重新创建 `GridData(70, 50)` 并调用 `ApplyInitialGrid(...)`
+    - 重新调用 `GridRenderer.RenderGrid()`
+    - 重新设置主相机初始中心与 orthographic size
+    - 重新调用 `BackgroundLayerRenderer.RebuildLayers()`
+
+- **编辑器态结果**：
+  - Grid：`70x50`
+  - Camera center：`(35, 25, -10)`
+  - Camera ortho：`8`
+  - Entrance：`(35, 46)`
+  - DemonLord start：`(35, 43)`
+  - Background draft：
+    - `BG_Base = 1`
+    - `BG_BackDeco = 0`
+    - `BG_MidDeco = 5`
+    - `BG_FrontDeco = 16`
+    - `draftCount = 21`
+
+- **A / B 类验证（本轮已完成）**：
+  - `refresh_unity(...wait_for_ready=true)` 成功
+  - `read_console(error+warning)`：无脚本 Error；仅保留既有 MCP WebSocket warning
+  - `execute_code` 编辑器态确认：
+    - `LevelConfig.Width == 70`
+    - `LevelConfig.Height == 50`
+    - 入口与魔王默认位置已按新高度推导
+    - 相机中心已对齐 `(35,25)`
+    - 背景层已按新尺寸重建
+  - 未进入 Play Mode
+  - 未修改 ProjectSettings / Assets/Settings / Prefab
+  - 未执行任何 git 操作
+
+- **边界说明**：
+  - 本轮只完成地图尺寸切换与背景层联动
+  - 未重做入口系统
+  - 未接入 Soil 主题随机渲染
+  - 当前场景仅做编辑器态可视化验证，未保存 Scene
+
+---
+
+### 2026-05-31 TASK-049 — Soil 主题集接入 + 顶部背景区修正
+
+- **任务目标**：
+  - 将地下土块渲染切换为 `Assets/Art/Tiles/` 下的 4 套基础土块主题
+  - 从**上往下第 11 层**开始进入地下，按每 **8 行** 切换一套土块颜色
+  - 修正入口 / 勇者 / 魔王默认落点误入顶部背景区的问题
+  - 修正顶部 10 行背景区被 `GridRenderer` 的黑色 Empty 覆盖的问题
+
+- **实际完成内容**：
+  - 修改 `Assets/Scripts/LevelConfig.cs`
+    - 移除“入口按从顶往下第 4 行直接计算 Y”的旧规则
+    - 新增 `entranceRowsBelowSurface`
+    - 入口改为相对 `UndergroundSurfaceY` 推导，默认放在地下表层下方第 1 行
+    - 新增 `IsSurfaceBackgroundRow(y)`，显式区分顶部背景区与地下可视区域
+  - 修改 `Assets/Scripts/GridManager.cs`
+    - 暴露 `IsSurfaceBackgroundRow(y)` 供渲染层判定顶部背景区
+  - 修改 `Assets/Scripts/GridRenderer.cs`
+    - 新增 4 套土块 palette 字段：
+      - `soilBrownSprites`
+      - `soilDarkBlueSprites`
+      - `soilDarkGreenSprites`
+      - `soilDarkPurpleRedSprites`
+    - 表层继续使用 `tile_soil_surface_00`
+    - 地下 Soil 改为按“从上往下第 11 行起，每 8 行切换一套颜色主题”
+    - 同一主题内按 `(x,y)` 稳定取样 16 张 tile，避免全屏单图重复
+    - 顶部 10 行若为 `Empty`，不再绘制黑色占位 sprite，改为透明留空给背景层
+  - 修改 `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
+    - 将入口规则同步为“地下表层下方第 1 行”，明确顶部 10 行只作背景区
+  - 修改 `Assets/AI_DOCS/TASKS.md`
+    - 标记 `TASK-049` 完成
+
+- **编辑器态验证（未保存 Scene）**：
+  - `refresh_unity(...wait_for_ready=true)` 成功
+  - `read_console(error+warning)`：无新增脚本 Error，仅保留既有 MCP WebSocket warning
+  - 使用 `execute_code` 在 Edit Mode 下完成当前测试场景的临时重建与渲染绑定：
+    - `GridRenderer` 绑定：
+      - `tile_soil_surface_00`
+      - `tile_soil_brown_00..15`
+      - `tile_soil_dark_blue_00..15`
+      - `tile_soil_dark_green_00..15`
+      - `tile_soil_dark_purple_red_00..15`
+    - 重新构建 `GridData(70,50)` 并重绘 `GridTiles`
+    - 当前结果：
+      - `Entrance = (35,38)`
+      - `DemonLord start = (35,35)`
+      - `SurfaceY = 39`
+      - 顶部 `y=49..40` 为 `Empty` 背景区
+      - `y=39` 为地下表层 Soil
+      - `y=38` 起为入口与地下有效玩法区
+
+- **边界说明**：
+  - 未进入 Play Mode
+  - 未保存 Scene
+  - 未修改 Scene / Prefab YAML
+  - 未执行 git
+  - 本轮未重做入口多格 prefab 系统（仍属于 `TASK-048` 范围）
+
+---
+
+### 2026-06-01 TASK-049A — 旧测试土块移除，统一切换到新主题土块
+
+- **任务目标**：
+  - 确认旧“地表 / 地底”测试土块是否仍承担功能逻辑
+  - 保留“地下表层不可点击”的玩法规则
+  - 删除旧测试土块 `tile_soil_surface_00` / `tile_soil_deep_00` 及其测试 prefab
+  - 让当前默认土块生成与渲染完全由新 `tile_soil_<color>_<index>` 主题集接管
+
+- **确认结论**：
+  - 是的，**从上往下第 11 行**对应的 `UndergroundSurfaceY` 这一层，仍是当前规则中的地下表层
+  - 该层依然由 `GridManager.IsDiggable(...)` 直接拒绝挖掘，因此**不可点击 / 不可破坏**
+  - `tile_soil_surface_00` / `tile_soil_deep_00` 确实是早期测试填充素材，不再适合作为当前正式默认土块路径
+
+- **实际完成内容**：
+  - 修改 `Assets/Scripts/GridRenderer.cs`
+    - 删除 `spriteSoilSurface` 依赖
+    - 表层与地下统一走新 palette 体系
+    - 若 palette 缺失，fallback 改为 `soilBrownSprites[0]`
+    - 旧 `tile_soil_surface_00` / `tile_soil_deep_00` 不再被代码使用
+  - 修改 `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
+    - 表层规则保留，但视觉说明改为并入新 `tile_soil_<color>_<index>` 体系
+  - 修改 `Assets/AI_DOCS/ART_NAMING_RULES.md`
+    - 旧功能型 `surface/deep` 命名改为历史/预留说明，不再作为当前默认生成路径
+  - 修改 `Assets/AI_DOCS/ART_INTAKE_LOG.md`
+    - 追加旧测试土块清理记录
+  - 修改 `Assets/AI_DOCS/TASKS.md`
+    - 追加 `TASK-049A`
+  - 通过 Unity Editor API 删除以下资源：
+    - `Assets/Art/Tiles/tile_soil_surface_00.png`
+    - `Assets/Art/Tiles/tile_soil_deep_00.png`
+    - `Assets/Prefabs/PF_Tile_Underground_Soil_Top.prefab`
+    - `Assets/Prefabs/PF_Tile_Underground_Soil_Dark.prefab`
+
+- **编辑器态处理（未手动改 YAML）**：
+  - 使用 `execute_code` 在 Edit Mode 中：
+    - 重新为 `GridRenderer` 绑定 4 套新土块 palette
+    - 清理旧 `GridTiles`
+    - 重新构建 `GridData(70,50)` 并重绘当前测试场景
+  - 当前结果：
+    - `Entrance = (35,38)`
+    - `DemonLord start = (35,35)`
+    - `SurfaceY = 39`
+    - 顶部背景区与地下土块区保持上一轮修正后的状态
+
+- **边界说明**：
+  - 表层不可点击规则仍保留，当前只替换素材与引用
+  - 未进入 Play Mode
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML
+
+---
+
+### 2026-06-01 TASK-049B — 解除第 11 行地下表层不可点击限制
+
+- **任务目标**：
+  - 取消“从上往下第 11 行 / `UndergroundSurfaceY` 必定不可点击”的旧玩法限制
+  - 保留顶部 10 行背景区不参与玩法点击的现状
+  - 恢复地下区域统一的四邻挖掘规则
+
+- **实际完成内容**：
+  - 修改 `Assets/Scripts/GridManager.cs`
+    - 从 `IsDiggable(int x, int y)` 中移除：
+      - `if (levelConfig != null && levelConfig.IsSurfaceLayer(y)) return false;`
+    - 现在只要目标格是 `Soil`，且四邻存在 `Empty` / `Entrance` 路径，就允许挖掘
+  - 修改 `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
+    - 将地下表层描述从“不可破坏 / 不可点击”改为“视觉分界线，但不再额外禁止点击 / 挖掘”
+    - 挖掘规则文字同步改为“`IsDiggable(x, y)` 通过（四邻有路）”
+  - 修改 `Assets/AI_DOCS/TASKS.md`
+    - 追加 `TASK-049B`
+
+- **规则结果**：
+  - 顶部 10 行背景区仍然不是玩法网格，不承担可点击挖掘功能
+  - 第 11 行起的地下土块现在全部遵守同一套四邻挖掘规则
+  - `IsSurfaceLayer(y)` 仍保留，当前只用于分层/视觉语义，不再承担“禁止点击”逻辑
+
+- **边界说明**：
+  - 未进入 Play Mode
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML

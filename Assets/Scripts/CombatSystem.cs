@@ -1,4 +1,7 @@
+using System.Collections;
 using UnityEngine;
+
+public class CombatResult { public bool HeroSurvived = true; }
 
 public class CombatSystem : MonoBehaviour
 {
@@ -6,6 +9,7 @@ public class CombatSystem : MonoBehaviour
     private HeroRenderer    heroRenderer;
     private MonsterManager  monsterManager;
     private MonsterRenderer monsterRenderer;
+    private GridManager     gridManager;
 
     private void Start()
     {
@@ -13,39 +17,56 @@ public class CombatSystem : MonoBehaviour
         heroRenderer    = GetComponent<HeroRenderer>()    ?? FindObjectOfType<HeroRenderer>();
         monsterManager  = GetComponent<MonsterManager>()  ?? FindObjectOfType<MonsterManager>();
         monsterRenderer = GetComponent<MonsterRenderer>() ?? FindObjectOfType<MonsterRenderer>();
+        gridManager     = GetComponent<GridManager>()     ?? FindObjectOfType<GridManager>();
 
         if (heroManager     == null) Debug.LogError("[CombatSystem] HeroManager not found.");
         if (heroRenderer    == null) Debug.LogError("[CombatSystem] HeroRenderer not found.");
         if (monsterManager  == null) Debug.LogError("[CombatSystem] MonsterManager not found.");
         if (monsterRenderer == null) Debug.LogError("[CombatSystem] MonsterRenderer not found.");
+        if (gridManager     == null) Debug.LogError("[CombatSystem] GridManager not found.");
 
         Debug.Log("[CombatSystem] Initialized.");
     }
 
     // Returns true if hero is still alive; false if hero died.
-    public bool ResolveCombatAt(int heroId, Vector2Int gridPos)
+    public IEnumerator ResolveCombatAt(int heroId, Vector2Int gridPos, CombatResult result)
     {
+        result.HeroSurvived = true;
+
         if (!monsterManager.HasMonster(gridPos.x, gridPos.y))
-            return true;
+            yield break;
 
         if (!heroManager.HasHero(heroId))
-            return false;
+        {
+            result.HeroSurvived = false;
+            yield break;
+        }
 
         HeroData    hero    = heroManager.GetHero(heroId);
         MonsterData monster = monsterManager.GetMonster(gridPos.x, gridPos.y);
 
-        Debug.Log($"[CombatSystem] Combat started at {gridPos}: Hero(HP={hero.CurrentHP}) vs {monster.DisplayName}(HP={monster.CurrentHP})");
+        Debug.Log($"[CombatSystem] Combat at {gridPos}: Hero(HP={hero.CurrentHP}) vs {monster.DisplayName}(HP={monster.CurrentHP})");
+
+        float interval = hero.AttackSpeed > 0f ? 1f / hero.AttackSpeed : 0.5f;
 
         while (hero.IsAlive() && monster.IsAlive())
         {
             monster.TakeDamage(hero.Attack);
             if (!monster.IsAlive())
             {
+                ResourceFlow.ScatterOrdinaryDeathResources(
+                    gridPos,
+                    monster,
+                    gridManager,
+                    DeathCause.HeroKill,
+                    monster.DisplayName);
                 monsterManager.RemoveMonster(gridPos.x, gridPos.y);
                 monsterRenderer.RemoveMonsterView(gridPos.x, gridPos.y);
-                Debug.Log($"[CombatSystem] Slime defeated at {gridPos}. Hero HP remaining: {hero.CurrentHP}");
-                return true;
+                Debug.Log($"[CombatSystem] {monster.DisplayName} defeated at {gridPos}. Hero HP: {hero.CurrentHP}");
+                yield break;
             }
+
+            yield return new WaitForSeconds(interval);
 
             hero.TakeDamage(monster.Attack);
             if (!hero.IsAlive())
@@ -53,10 +74,11 @@ public class CombatSystem : MonoBehaviour
                 heroManager.RemoveHero(heroId);
                 heroRenderer.RemoveHeroView(heroId);
                 Debug.Log($"[CombatSystem] Hero {heroId} defeated at {gridPos}.");
-                return false;
+                result.HeroSurvived = false;
+                yield break;
             }
-        }
 
-        return hero.IsAlive();
+            yield return new WaitForSeconds(interval);
+        }
     }
 }

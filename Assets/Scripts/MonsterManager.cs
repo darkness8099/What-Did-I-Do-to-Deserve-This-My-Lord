@@ -24,7 +24,7 @@ public class MonsterManager : MonoBehaviour
 
     public bool CanPlaceMonster(int x, int y)
     {
-        if (!gridManager.GetGridData().IsInside(x, y))
+        if (!gridManager.IsInside(x, y))
         {
             Debug.LogWarning($"[MonsterManager] CanPlaceMonster: ({x},{y}) is out of bounds.");
             return false;
@@ -39,15 +39,22 @@ public class MonsterManager : MonoBehaviour
         return true;
     }
 
-    public bool PlaceSlime(int x, int y)
+    public bool PlaceMonster(int x, int y, MonsterArchetype archetype)
     {
+        if (archetype == null)
+        {
+            Debug.LogWarning("[MonsterManager] PlaceMonster: archetype is null. Skipped.");
+            return false;
+        }
         if (!CanPlaceMonster(x, y))
             return false;
 
-        monsters[new Vector2Int(x, y)] = new MonsterData(MonsterType.Slime);
-        Debug.Log($"[MonsterManager] Slime placed at ({x},{y}).");
+        monsters[new Vector2Int(x, y)] = new MonsterData(archetype);
+        Debug.Log($"[MonsterManager] {archetype.DisplayName} placed at ({x},{y}).");
         return true;
     }
+
+    public bool PlaceSlime(int x, int y) => PlaceMonster(x, y, MonsterArchetype.Slime);
 
     public bool HasMonster(int x, int y)
     {
@@ -61,6 +68,25 @@ public class MonsterManager : MonoBehaviour
             return data;
         return null;
     }
+
+public Vector2Int? FindNearestMonsterInRange(Vector2Int heroPos, float range)
+    {
+        if (monsters == null || monsters.Count == 0) return null;
+
+        Vector2Int? nearest = null;
+        float nearestDist = float.MaxValue;
+        foreach (var pos in monsters.Keys)
+        {
+            float dist = Mathf.Abs(pos.x - heroPos.x) + Mathf.Abs(pos.y - heroPos.y);
+            if (dist <= range && dist < nearestDist)
+            {
+                nearest = pos;
+                nearestDist = dist;
+            }
+        }
+        return nearest;
+    }
+
 
     public bool RemoveMonster(int x, int y)
     {
