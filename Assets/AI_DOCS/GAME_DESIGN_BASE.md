@@ -190,22 +190,24 @@ GridManager.Awake() 在 y=9 行的 x=6/10/14/18/22 预设 MagicPower=1、Element
 
 ### 初始养分生成规则（TASK-054）
 
-初始地图养分不应平均分布，也不应在普通初始地图中大量自然生成高阶养分。地下土块默认 `Nutrient = 0`，大部分地下区域应保持贫瘠；初始养分主要以局部 Lv1 团簇出现，高级养分主要由玩家经营生态后，通过魔物繁殖、死亡、捕食、生命周期转化等循环逐步产生。
+初始地图养分不应平均分布，也不应在普通初始地图中大量自然生成高阶养分。地下土块以低级养分底噪为基础，并叠加多个 Lv1 团簇；贫瘠区仍存在，但早期关卡不应被理解为只有少数孤立团簇。高级养分主要由玩家经营生态后，通过魔物繁殖、死亡、捕食、生命周期转化等循环逐步产生。
 
 正式生成方向：
 
-- 默认所有地下 Soil 的 `Nutrient = 0`。
+- 默认地下 Soil 可有较高覆盖率的低级底噪，值通常为 `1~3`。
 - 根据关卡阶段生成若干 `NutrientCluster`。
-- 每个团簇包含 `center`、`radius`、`power`、`falloff`。
-- 越靠近中心养分越高，越远离中心养分越低。
-- 团簇之外保持贫瘠。
+- 每个团簇包含 `center`、`radiusX`、`radiusY`、`power`、`falloff`、`density`。
+- 团簇是概率型椭圆区域：范围内只是提高养分出现概率，不是每格必定赋值。
+- 越靠近中心，出现概率与高值概率越高；边缘允许破碎、空洞、低高养分混杂。
+- 团簇之外可以是贫瘠区或低级底噪区。
+- Lv2 / Lv3 种子点必须依附已有 nutrient cluster，优先出现在中心或高密度区域附近，可替换已有 Lv1 格子，但不得孤立出现在大片 0 养分区。
 - 最后按当前关卡限制裁剪 `maxInitialNutrient`。
 
 阶段规则：
 
 | 阶段 | 初始养分方向 | Lv2 初始出现 | Lv3 初始出现 |
 |---|---|---|---|
-| Stage 1 | 只允许 Lv1 初始养分，少量局部团簇 | 0 | 0 |
+| Stage 1 | 较高覆盖率低级底噪 + 多个重叠 Lv1 团簇 | 极少量种子点 | 0 |
 | Stage 2 | Lv1 团簇数量或范围略增加 | 极少量种子点 | 0 |
 | Stage 3+ | Lv1 / Lv2 初始资源逐渐增加 | 可增加但仍受控 | 非常克制，主要由生态循环产生 |
 
@@ -218,7 +220,18 @@ GridManager.Awake() 在 y=9 行的 x=6/10/14/18/22 预设 MagicPower=1、Element
 | `tile_06` ~ `tile_10` | Lv2，小花阶段 | 中后期初始种子或生态成长反馈 |
 | `tile_11` ~ `tile_15` | Lv3，大花 / 繁花阶段 | 成熟生态区域，普通初始地图应少见 |
 
-后续实现建议拆为小任务：`StageNutrientProfile`、`NutrientClusterSettings`、`GridManager.GenerateInitialNutrients()`、养分值到 `tile_00` ~ `tile_15` 的视觉映射复核，以及生态系统动态改变 Soil 养分后刷新外观。实现时应替换当前 `LevelConfig.ApplyInitialSoilAttributes()` 的全图测试分布，避免早期关卡天然铺满 Lv2 / Lv3 外观。
+后续实现建议拆为小任务：养分值到 `tile_00` ~ `tile_15` 的视觉映射复核，以及生态系统动态改变 Soil 养分后刷新外观。
+
+当前实现状态（TASK-056）：
+
+- 已新增 `StageNutrientProfile` / `NutrientClusterSettings`。
+- `LevelConfig.ApplyInitialSoilAttributes()` 已改为调用团簇式 `GenerateInitialNutrient()`。
+- 默认 profile 为 Stage 1：较高覆盖率低级基础散布 + 多个重叠 Lv1 团簇 + 极少量 Lv2 种子点，不生成 Lv3 初始种子点。
+- 当前 70x50 默认地图使用 10 个概率型椭圆 Lv1 团簇，并叠加约 35% 的低值散布层，散布值为 `1~3`。
+- `LevelConfig.initialNutrientSeed = 0` 时，每次初始化自动生成随机 seed，同一 Stage 1 规则下分布位置会变化；填入非 0 seed 时，分布可复现。
+- 如果 Inspector 中存在一个空的 `StageNutrientProfile`（无团簇、无基础散布、无种子点），视为未配置，仍回退到默认 Stage 1 配置。
+- `nutrient > 0` 且 visual index 不超过 Lv1 范围时，才写入 `TileElementType.Slime` 生成倾向。
+- 后续如需 Stage 2 / Stage 3+，应通过 profile 调整 `maxInitialNutrient`、`clusters` 与种子点数量，而不是恢复全图平均测试分布。
 
 ### 挖掘规则（正式版）
 

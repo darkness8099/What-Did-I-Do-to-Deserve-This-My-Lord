@@ -14,11 +14,22 @@ public class GridRenderer : MonoBehaviour
     private Sprite         _whitePlaceholder;
     private GameObject[,]  tileObjects;
 
+private void OnEnable()
+    {
+        TryBindGridManager();
+        if (gridManager != null)
+            gridManager.TileAttributeChanged += RefreshCell;
+    }
+
+    private void OnDisable()
+    {
+        if (gridManager != null)
+            gridManager.TileAttributeChanged -= RefreshCell;
+    }
+
 private void Start()
     {
-        gridManager = GetComponent<GridManager>();
-        if (gridManager == null)
-            gridManager = FindObjectOfType<GridManager>();
+        TryBindGridManager();
 
         if (gridManager == null)
         {
@@ -33,6 +44,15 @@ private void Start()
             4f);
 
         RenderGrid();
+    }
+
+    private void TryBindGridManager()
+    {
+        if (gridManager != null) return;
+
+        gridManager = GetComponent<GridManager>();
+        if (gridManager == null)
+            gridManager = FindObjectOfType<GridManager>();
     }
 
 

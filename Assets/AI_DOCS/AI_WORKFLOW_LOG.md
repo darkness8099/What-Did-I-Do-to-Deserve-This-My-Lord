@@ -2946,3 +2946,287 @@ GridData → GridManager → GridRenderer → InputHandler（挖掘）
   - 未进入 Play Mode
   - 未执行 git
   - 未直接编辑 Scene / Prefab YAML
+
+---
+
+### 2026-06-01 TASK-055 — 初始养分阶段配置数据结构
+
+- **任务目标**：
+  - 为 TASK-056 的团簇式初始养分生成准备最小数据结构
+  - 不在本轮替换 `LevelConfig.ApplyInitialSoilAttributes()`，避免一次性改动生成逻辑
+
+- **实际完成内容**：
+  - 新增 `Assets/Scripts/Core/StageNutrientProfile.cs`
+    - 新增 `InitialNutrientStage`
+      - `Stage1`
+      - `Stage2`
+      - `Stage3Plus`
+    - 新增 `NutrientClusterSettings`
+      - `center`
+      - `radius`
+      - `power`
+      - `falloff`
+    - 新增 `StageNutrientProfile`
+      - `stage`
+      - `maxInitialNutrient`
+      - `clusters`
+      - `lv2SeedCount`
+      - `lv3SeedCount`
+      - `AllowsLv2Seeds`
+      - `AllowsLv3Seeds`
+  - 修改 `Assets/AI_DOCS/TASKS.md`
+    - 将 `TASK-055` 标记为完成
+
+- **规则确认**：
+  - `Stage1` 不允许 Lv2 / Lv3 初始种子点
+  - `Stage2` 允许极少量 Lv2 种子点，不允许 Lv3
+  - `Stage3Plus` 才允许 Lv3 种子参数，但仍由后续生成逻辑克制使用
+
+- **边界说明**：
+  - 未接入 `LevelConfig`
+  - 未替换当前全图测试养分分布
+  - 未修改场景
+  - 未进入 Play Mode
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML
+
+---
+
+### 2026-06-01 TASK-056 — 初始养分团簇式生成接入
+
+- **任务目标**：
+  - 将 TASK-053 的全图测试养分分布替换为低级团簇式初始化
+  - 保证默认 Stage 1 主要只出现 `tile_00` ~ `tile_05`
+  - 不改地图核心尺寸、挖掘规则、渲染层级或场景对象
+
+- **实际完成内容**：
+  - 修改 `Assets/Scripts/Core/StageNutrientProfile.cs`
+    - 为 `NutrientClusterSettings` 增加构造函数，便于代码创建默认团簇
+    - 为 `StageNutrientProfile` 增加构造函数，便于 `LevelConfig` 生成默认 Stage 1 profile
+  - 修改 `Assets/Scripts/Core/LevelConfig.cs`
+    - 移除旧的 `initialSoilNutrientMin / initialSoilNutrientMax` 全图测试参数
+    - 新增 `initialNutrientProfile`
+    - `ApplyInitialSoilAttributes()` 改为调用团簇式 `GenerateInitialNutrient()`
+    - 默认 profile 为 Stage 1：少量 Lv1 团簇，`maxInitialNutrient = 10`，Lv2 / Lv3 seed count 为 0
+    - 团簇之外 Soil 保持 `Nutrient = 0`
+    - 只有 `nutrient > 0` 且 visual index 不超过 Lv1 范围时，才写入 `TileElementType.Slime`
+  - 修改 `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
+    - 更新 TASK-056 当前实现状态
+  - 修改 `Assets/AI_DOCS/TASKS.md`
+    - 将 `TASK-056` 标记为完成
+
+- **规则确认**：
+  - 初始地图不再平均铺高阶养分
+  - 默认 Stage 1 不生成 Lv2 / Lv3 初始种子点
+  - 高级养分仍应主要由后续生态循环产生
+
+- **边界说明**：
+  - 未修改场景
+  - 未进入 Play Mode
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML
+
+---
+
+### 2026-06-01 TASK-056E — 概率型椭圆 nutrient cluster
+
+- **任务目标**：
+  - 将 nutrient cluster 从确定性同心圆衰减改为概率型椭圆团簇
+  - 避免规则圆形感，允许空洞、破碎边缘、低高养分混杂
+  - Lv2 / Lv3 种子点必须依附已有团簇，不得孤立出现在大片 0 养分区域
+
+- **实际完成内容**：
+  - 修改 `Assets/Scripts/Core/StageNutrientProfile.cs`
+    - `NutrientClusterSettings` 新增 / 改用：
+      - `radiusX`
+      - `radiusY`
+      - `density`
+    - 保留旧 `radius` 构造函数兼容，内部转为 `radiusX = radiusY`
+  - 修改 `Assets/Scripts/Core/LevelConfig.cs`
+    - 默认 Stage 1 团簇改为 seed 驱动的椭圆半径
+    - `CalculateClusterNutrient()` 改为概率命中：
+      - 椭圆归一化距离 <= 1 才进入团簇范围
+      - 距离中心越近出现概率越高
+      - 命中后在低值到高值间按 seed 取值，允许同团簇内低高混杂
+      - 未命中则保持底噪或 0，形成空洞与破碎边缘
+    - Lv2 / Lv3 seed 点改为 `IsClusterSeedPoint()`
+      - 只从团簇内部中心附近候选位置挑选
+      - 候选位置必须已有团簇养分
+      - 可替换已有 Lv1 格子为 Lv2 / Lv3 种子
+  - 修改 `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
+    - 更新 nutrient cluster 语义为概率型椭圆
+  - 修改 `Assets/AI_DOCS/TASKS.md`
+    - 追加并完成 `TASK-056E`
+
+- **规则确认**：
+  - 团簇不再是实心圆形衰减
+  - Lv2 初始种子点依附团簇高密度区域
+  - Lv3 在 Stage 1 仍为 0
+
+- **边界说明**：
+  - 未修改场景
+  - 未进入 Play Mode
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML
+
+---
+
+### 2026-06-01 TASK-056D — Stage 1 初始养分 seed 化
+
+- **问题确认**：
+  - TASK-056C 后 Stage 1 的养分总量与结构合理，但默认位置仍是确定性的
+  - 理想规则应为：遵循 Stage 1 的底噪 / 团簇 / 种子点比例，但每次刷新或新地图可以得到不同视觉分布
+
+- **实际完成内容**：
+  - 修改 `Assets/Scripts/Core/LevelConfig.cs`
+    - 新增 `initialNutrientSeed`
+    - `initialNutrientSeed = 0` 时，每次初始化自动生成随机 seed
+    - `initialNutrientSeed != 0` 时，使用固定 seed 复现同一养分分布
+    - 默认 Stage 1 团簇中心加入 seed 控制的横向与深度偏移
+    - 低级底噪散布与 `1~3` 数值由 seed 驱动
+    - Lv2 种子点位置由 seed 驱动，并保持数量极少
+  - 修改 `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
+    - 记录 seed 为 0 自动换分布、非 0 可复现的规则
+  - 修改 `Assets/AI_DOCS/TASKS.md`
+    - 追加并完成 `TASK-056D`
+
+- **规则确认**：
+  - Stage 1 仍使用较高覆盖率低级底噪 + 多个 Lv1 团簇 + 极少量 Lv2 种子点
+  - seed 只改变分布位置，不改变 Stage 1 的资源等级边界
+  - Lv3 仍不初始生成
+
+- **边界说明**：
+  - 未修改场景
+  - 未进入 Play Mode
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML
+
+---
+
+### 2026-06-01 TASK-056C — Stage 1 初始养分加厚
+
+- **任务目标**：
+  - 修正“早期关卡 = 少量孤立团簇”的误解
+  - Stage 1 改为“较高覆盖率低级养分底噪 + 多个重叠 Lv1 团簇 + 极少量 Lv2 种子点”
+  - 限制高级养分，而不是限制低级养分总量
+
+- **实际完成内容**：
+  - 修改 `Assets/Scripts/Core/LevelConfig.cs`
+    - 默认 Stage 1 基础散布从 `0.12` 提高到 `0.35`
+    - 基础散布值保持 `1~3`
+    - 默认 Lv1 团簇从 8 个提高到 10 个
+    - 团簇半径整体增加，形成更多重叠区域
+    - 默认加入 6 个 Lv2 种子点
+    - Lv3 seed count 仍为 `0`
+  - 修改 `Assets/Scripts/Core/StageNutrientProfile.cs`
+    - Stage 1 允许显式配置的极少量 Lv2 种子点
+    - Stage 1 仍不允许 Lv3 种子点
+  - 修改 `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
+    - 更新 Stage 1 初始养分设计语义
+  - 修改 `Assets/AI_DOCS/TASKS.md`
+    - 追加并完成 `TASK-056C`
+
+- **规则确认**：
+  - Stage 1 现在重点限制 Lv3 与大量高级养分，不再限制低级养分总量
+  - Lv2 只作为极少量初始种子点存在
+  - Lv3 仍禁止初始生成
+
+- **边界说明**：
+  - 未修改场景
+  - 未进入 Play Mode
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML
+
+---
+
+### 2026-06-01 TASK-056B — 空 Stage profile 回退默认初始养分配置
+
+- **问题确认**：
+  - 当前测试场景中的 `LevelConfig.initialNutrientProfile` 已被 Unity Inspector 序列化为一个空 profile
+  - 该 profile 的状态为：`baseScatterChance = 0`、`clusters = 0`、`lv2SeedCount = 0`、`lv3SeedCount = 0`
+  - 因为字段不为 null，旧逻辑不会使用默认 Stage 1 fallback，导致用户运行时看不出新的 8 团簇 + 12% 散布效果
+
+- **实际完成内容**：
+  - 修改 `Assets/Scripts/Core/LevelConfig.cs`
+    - 新增 `HasConfiguredInitialNutrientProfile(profile)`
+    - 只有当 profile 存在有效基础散布、团簇或种子点时才使用 Inspector profile
+    - 空 profile 视为未配置，自动回退到默认 Stage 1 配置
+  - 修改 `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
+    - 记录空 profile 回退默认 Stage 1 的规则
+
+- **边界说明**：
+  - 未修改场景
+  - 未进入 Play Mode
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML
+
+---
+
+### 2026-06-01 TASK-056A — Stage 1 初始生态启动量调参
+
+- **任务目标**：
+  - 修正默认 Stage 1 初始养分过于保守的问题
+  - 将初始结构从“只有少数团簇”调整为“低级基础散布 + 多个 Lv1 团簇”
+  - 继续禁止 Lv2 / Lv3 初始生成，避免高级养分提前大量出现
+
+- **实际完成内容**：
+  - 修改 `Assets/Scripts/Core/StageNutrientProfile.cs`
+    - 新增基础散布参数：
+      - `baseScatterChance`
+      - `baseScatterMin`
+      - `baseScatterMax`
+  - 修改 `Assets/Scripts/Core/LevelConfig.cs`
+    - 默认 Stage 1 团簇数从 3 个提高到 8 个
+    - 默认叠加 `0.12` 的低值基础散布层
+    - 基础散布值范围为 `1~3`
+    - `maxInitialNutrient` 保持 `10`
+    - Lv2 / Lv3 seed count 仍为 `0`
+  - 修改 `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
+    - 更新当前 Stage 1 默认实现说明
+  - 修改 `Assets/AI_DOCS/TASKS.md`
+    - 追加并完成 `TASK-056A`
+
+- **规则确认**：
+  - Stage 1 仍只产生 Lv1 初始养分
+  - 低值散布用于保证生态启动量
+  - 多个团簇用于形成更明确的局部可经营区域
+  - 高级养分仍主要由后续生态循环产生
+
+- **边界说明**：
+  - 未修改场景
+  - 未进入 Play Mode
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML
+
+---
+
+### 2026-06-01 TASK-057 — Soil 养分变化外观刷新
+
+- **任务目标**：
+  - 让生态系统动态改变 Soil 养分后，对应土块 sprite 能自动刷新
+  - 避免每个资源流入口各自维护一套刷新半径逻辑
+
+- **实际完成内容**：
+  - 修改 `Assets/Scripts/Grid/GridManager.cs`
+    - 新增 `TileAttributeChanged` 事件
+    - `SetTileAttribute()` 成功写入 Soil 属性后触发该事件
+  - 修改 `Assets/Scripts/Grid/GridRenderer.cs`
+    - `OnEnable()` 绑定 `GridManager.TileAttributeChanged`
+    - `OnDisable()` 解绑事件
+    - 收到事件后调用已有 `RefreshCell(x, y)`
+  - 修改 `Assets/Scripts/Grid/DigActionHandler.cs`
+    - 移除资源散布后的手动 `RefreshNearbyCells()` 半径刷新
+    - 挖掘当前格仍立即刷新 Empty 外观；周围 Soil 的养分外观由 `SetTileAttribute()` 事件驱动
+  - 修改 `Assets/AI_DOCS/TASKS.md`
+    - 将 `TASK-057` 标记为完成
+
+- **规则确认**：
+  - 只要后续系统通过 `GridManager.SetTileAttribute()` 改变 Soil 资源，外观会自动刷新
+  - `ResourceFlow` 分发到 Soil 时已经走 `GridManager.SetTileAttribute()`，因此死亡回流 / 挖掘残余散布会触发刷新
+  - 捕食溢出目前进入 `FloatingResourcePool`，不写 Soil，因此不会触发 Soil 外观刷新
+
+- **边界说明**：
+  - 未修改场景
+  - 未进入 Play Mode
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML

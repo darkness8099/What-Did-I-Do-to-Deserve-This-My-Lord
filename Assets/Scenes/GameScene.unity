@@ -415,7 +415,18 @@ MonoBehaviour:
   openCellsBelowEntrance: 3
   demonLordCellsBelowEntrance: 3
   surfaceBackgroundRows: 10
-  heroSpawnDelaySeconds: 10
+  initialNutrientProfile:
+    stage: 1
+    maxInitialNutrient: 10
+    baseScatterChance: 0
+    baseScatterMin: 1
+    baseScatterMax: 3
+    clusters: []
+    lv2SeedCount: 0
+    lv3SeedCount: 0
+  initialNutrientSeed: 0
+  initialSlimeMaxVisualIndex: 5
+  heroSpawnDelaySeconds: 100
   cameraViewColumns: 28
   cameraViewRows: 16
   testSlimeAttributePositions:

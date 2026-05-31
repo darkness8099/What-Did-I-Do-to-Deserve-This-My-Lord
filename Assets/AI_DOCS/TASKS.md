@@ -124,9 +124,14 @@
 - [x] **TASK-052** — Scripts 目录分类整理：通过 Unity AssetDatabase 移动脚本到 Core / Grid / Input / Hero / DemonLord / Monsters / Combat / Ecology / Background / UI；Editor 自定义 Inspector 移至 `Assets/Editor/Background`
 - [x] **TASK-053** — 土块养分外观规则接入：`TileAttributeData.Nutrient` 映射到 Soil 主题 0-15 图；0 / 1-10 / 11-20 / 21+ 分段决定 1-3 级外观；所有外观仍统一为可挖 `CellType.Soil`
 - [x] **TASK-054** — 初始养分生成规则固化：规定地下 Soil 默认 0 养分，初始养分以 Lv1 局部团簇为主，Lv2 仅中后期少量种子点，Lv3 主要由生态循环成长产生；当前全图测试养分分布标记为后续替换对象
-- [ ] **TASK-055** — 新增 `StageNutrientProfile` / `NutrientClusterSettings` 最小数据结构，用于表达关卡阶段、团簇中心、半径、强度、衰减与 `maxInitialNutrient`
-- [ ] **TASK-056** — 将 `LevelConfig.ApplyInitialSoilAttributes()` 当前全图测试养分分布替换为 `GenerateInitialNutrients()` 团簇式初始化，保证 Stage 1 主要只生成 `tile_00` ~ `tile_05`
-- [ ] **TASK-057** — 接入生态系统动态改变 Soil 养分后的外观刷新：魔物繁殖、死亡回流、捕食溢出、生命周期转化等改变资源时刷新对应土块 sprite
+- [x] **TASK-055** — 新增 `StageNutrientProfile` / `NutrientClusterSettings` 最小数据结构，用于表达关卡阶段、团簇中心、半径、强度、衰减与 `maxInitialNutrient`
+- [x] **TASK-056** — 将 `LevelConfig.ApplyInitialSoilAttributes()` 当前全图测试养分分布替换为 `GenerateInitialNutrients()` 团簇式初始化，保证 Stage 1 主要只生成 `tile_00` ~ `tile_05`
+- [x] **TASK-056A** — Stage 1 初始生态启动量调参：默认改为 8 个 Lv1 团簇 + 约 12% 的 1~3 低值基础散布，仍禁止 Lv2 / Lv3 初始生成
+- [x] **TASK-056B** — 空 `StageNutrientProfile` 回退默认配置：Inspector 中无团簇、无基础散布、无种子点的 profile 视为未配置，使用默认 Stage 1 生成
+- [x] **TASK-056C** — Stage 1 初始养分加厚：默认改为约 35% 的 1~3 低级底噪 + 10 个重叠 Lv1 团簇 + 极少量 Lv2 种子点，仍禁止 Lv3 初始生成
+- [x] **TASK-056D** — Stage 1 初始养分 seed 化：同一 Stage 规则下按随机种子改变底噪、团簇与 Lv2 种子点位置；seed 为 0 时每次初始化自动换分布，非 0 时可复现
+- [x] **TASK-056E** — Nutrient cluster 改为概率型椭圆团簇：使用 `radiusX / radiusY / density`，团簇内允许空洞与破碎边缘；Lv2 / Lv3 种子点依附团簇高密度区域生成
+- [x] **TASK-057** — 接入生态系统动态改变 Soil 养分后的外观刷新：魔物繁殖、死亡回流、捕食溢出、生命周期转化等改变资源时刷新对应土块 sprite
 
 ---
 

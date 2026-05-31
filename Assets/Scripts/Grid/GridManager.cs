@@ -13,6 +13,8 @@ public class GridManager : MonoBehaviour
     private LevelConfig levelConfig;
     private GridData gridData;
 
+    public event System.Action<int, int> TileAttributeChanged;
+
     private void Awake()
     {
         levelConfig = GetComponent<LevelConfig>() ?? FindObjectOfType<LevelConfig>();
@@ -112,5 +114,6 @@ public class GridManager : MonoBehaviour
             return;
         }
         gridData.SetTileAttribute(x, y, attribute);
+        TileAttributeChanged?.Invoke(x, y);
     }
 }
