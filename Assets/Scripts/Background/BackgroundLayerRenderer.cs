@@ -109,29 +109,20 @@ public class BackgroundLayerRenderer : MonoBehaviour
         GameObject tempRoot = new GameObject(System.IO.Path.GetFileNameWithoutExtension(savePath));
         try
         {
-            string[] layerRoots =
+            // Save ALL children under BackgroundLayerRoot — includes procedural BG_* layers AND any
+            // manually adjusted / hand-added art GameObjects the user wants to keep.
+            int childCount = transform.childCount;
+            for (int i = 0; i < childCount; i++)
             {
-                "BG_Base",
-                "BG_BackDeco",
-                "BG_MidDeco",
-                "BG_FrontDeco",
-                "BG_TopDeco",
-            };
-
-            for (int i = 0; i < layerRoots.Length; i++)
-            {
-                Transform child = transform.Find(layerRoots[i]);
-                if (child != null)
-                {
-                    GameObject clone = Instantiate(child.gameObject);
-                    clone.name = child.gameObject.name;
-                    clone.transform.SetParent(tempRoot.transform, false);
-                }
+                Transform child = transform.GetChild(i);
+                GameObject clone = Instantiate(child.gameObject);
+                clone.name = child.gameObject.name;
+                clone.transform.SetParent(tempRoot.transform, false);
             }
 
             if (tempRoot.transform.childCount == 0)
             {
-                Debug.LogWarning("[BackgroundLayerRenderer] Nothing to save. Generate background first.");
+                Debug.LogWarning("[BackgroundLayerRenderer] Nothing to save. BackgroundLayerRoot has no children.");
                 return false;
             }
 

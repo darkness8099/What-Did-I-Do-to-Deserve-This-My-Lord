@@ -111,7 +111,7 @@
 - [x] **TASK-045** — `DecorationPlacementData` + `SurfaceDecorationSpawner`：随机种子 + 按 Profile 生成草稿 + 清除 / 重生；不写 Scene 文件
 - [x] **TASK-046** — `BackgroundLayerRenderer`：4 层 BG（Base / BackDeco / MidDeco / FrontDeco）sortingOrder 接入；`bg_overworld_00` 铺底；spawner 输出按 layer 实例化
 - [x] **TASK-047** — 地图尺寸正式扩到 70×50（`LevelConfig.width=70, height=50`，入口默认列 ≈ 34）；与 BG 层联动
-- [ ] **TASK-048** — 入口系统重做：新 `EntranceManager` / `EntranceRenderer`，多格大尺寸 `entrance_*` 实例化 + 新勇者出生流程（衔接 TASK-038 流程）
+- [x] **TASK-048** — 入口系统重做（综合实现关闭）：多格大尺寸 `entrance_*` 实例化由 `BackgroundLayerRenderer` 承担（TASK-046 / 046B / 050C）；入口连接点 + Entrance 格黑色空洞渲染由 TASK-051 实现；勇者出生 + 魔王放置流程由 TASK-038 实现；不再单独抽象 `EntranceManager` / `EntranceRenderer`
 - [x] **TASK-049** — Soil 主题集接入：`GridRenderer` 按 grid 位置 / 主题 / 随机选用 4 色 × 16 张 `tile_soil_<color>_<index>`
 - [x] **TASK-049A** — 旧测试土块清理：删除 `tile_soil_surface_00` / `tile_soil_deep_00` 及其测试 prefab，默认土块生成完全切换到新主题集
 - [x] **TASK-049B** — 解除地下表层（第 11 行）不可点击限制，顶部 10 行背景区之外恢复统一四邻挖掘规则

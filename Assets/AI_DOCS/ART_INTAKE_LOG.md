@@ -33,6 +33,7 @@
 | 2026-05-31 | bulk_art_drop_v1 — Tiles | 64 | Tiles | OK — Soil 4 色主题集 × 16 张：`tile_soil_brown_00..15` / `tile_soil_dark_blue_00..15` / `tile_soil_dark_green_00..15` / `tile_soil_dark_purple_red_00..15` → `Art/Tiles/` | AI 协助 |
 | 2026-05-31 | bulk_art_drop_v1 — Vegetation | 5 | Vegetation | OK — `veg_00..04`（程序化生成池）→ **新建** `Art/Vegetation/` | AI 协助 |
 | 2026-06-01 | legacy_soil_cleanup_v1 | 2 删除 | Tiles | OK — 删除旧测试土块 `tile_soil_surface_00` / `tile_soil_deep_00`，当前默认土块生成完全切换到 4 色主题集 | AI 协助 |
+| 2026-06-01 | overworld_backgrounds_v2 | 3 | Backgrounds | OK — `bg_overworld_01`（3360×553）/ `bg_overworld_02`（3360×431）/ `bg_overworld_03`（3360×415）→ `Art/Backgrounds/`；maxTextureSize=4096 保全宽；高度不一不影响使用，用户后续在 Editor 调整位置 | AI 协助 |
 
 ---
 

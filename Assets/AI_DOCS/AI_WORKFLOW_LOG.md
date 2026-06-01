@@ -3230,3 +3230,20 @@ GridData → GridManager → GridRenderer → InputHandler（挖掘）
   - 未进入 Play Mode
   - 未执行 git
   - 未直接编辑 Scene / Prefab YAML
+
+---
+
+### 2026-06-01 TASK-048 关闭说明 — 入口系统重做（综合实现满足，不单独抽象）
+
+**阶段：阶段 9 / 任务台账整理**
+
+- **背景**：TASK-048 原描述（"新 `EntranceManager` / `EntranceRenderer` + 多格 `entrance_*` 实例化 + 勇者出生流程"）在后续推进中已被其他 task 综合实现：
+  - 多格大尺寸 `entrance_*` 实例化 → **TASK-046 / 046B / 050C** 由 `BackgroundLayerRenderer` 承担（走 `BG_MidDeco` 层，含 Editor 草稿 + Play Mode 随机载入已保存 Prefab）
+  - 入口连接点 + Entrance 格视觉 → **TASK-051**（入口固定为中列第 10 行，Entrance 格按黑色空洞渲染）
+  - 勇者出生 + 魔王放置流程 → **TASK-038**（10 秒倒计时后进入魔王放置阶段，然后生成勇者）
+- **决策**：不新建独立 `EntranceManager` / `EntranceRenderer` 类。入口语义已分散在 `LevelConfig`（坐标）+ `GridRenderer`（Entrance 格视觉）+ `BackgroundLayerRenderer`（视觉入口 sprite）+ `HeroMover` / `DemonLordManager`（出生 / 放置流程）；再抽 Manager 属于过度抽象
+- **修改内容**：
+  - `Assets/AI_DOCS/TASKS.md` — TASK-048 改为 `[x]` 并备注综合实现来源
+  - 本条日志条目
+- **未做**：未改任何代码 / Scene / Prefab / 美术；未执行 git
+- **Console**：0 error / 0 warning（保持前状态）

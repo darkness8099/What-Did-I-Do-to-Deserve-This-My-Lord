@@ -17,6 +17,14 @@ public class GridManager : MonoBehaviour
 
     private void Awake()
     {
+        InitializeGrid();
+    }
+
+    public bool IsInitialized => gridData != null;
+
+    // Public so Edit Mode tools can rebuild grid data without entering Play Mode.
+    public void InitializeGrid()
+    {
         levelConfig = GetComponent<LevelConfig>() ?? FindObjectOfType<LevelConfig>();
         if (levelConfig == null)
         {

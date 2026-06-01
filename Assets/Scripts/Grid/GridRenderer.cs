@@ -13,6 +13,7 @@ public class GridRenderer : MonoBehaviour
     private GridManager    gridManager;
     private Sprite         _whitePlaceholder;
     private GameObject[,]  tileObjects;
+    private GameObject     gridTilesParent;
 
 private void OnEnable()
     {
@@ -29,21 +30,83 @@ private void OnEnable()
 
 private void Start()
     {
-        TryBindGridManager();
+        RebuildGrid();
+    }
 
+    // Public entry usable from Editor tools.
+    public void RebuildGrid()
+    {
+        TryBindGridManager();
         if (gridManager == null)
         {
             Debug.LogError("[GridRenderer] GridManager not found in scene.");
             return;
         }
 
+        if (!gridManager.IsInitialized)
+        {
+            Debug.LogWarning("[GridRenderer] GridManager not initialized; cannot render.");
+            return;
+        }
+
+        EnsureWhitePlaceholder();
+        ClearGeneratedGrid();
+        RenderGrid();
+    }
+
+    // Editor button: initializes grid data + renders. Mirrors BackgroundLayerRenderer.GenerateDraftInEditor.
+    public void GenerateGridInEditor()
+    {
+        TryBindGridManager();
+        if (gridManager == null)
+        {
+            Debug.LogError("[GridRenderer] GridManager not found in scene.");
+            return;
+        }
+
+        gridManager.InitializeGrid();
+        RebuildGrid();
+        MarkDirty();
+    }
+
+    // Editor button: destroys all rendered tiles + frees the parent GameObject.
+    public void ClearGeneratedGrid()
+    {
+        if (gridTilesParent != null)
+        {
+            DestroyObjectSafe(gridTilesParent);
+            gridTilesParent = null;
+        }
+        // Also clean up any orphaned GridTiles at scene root (e.g. from older edit-mode preview).
+        var orphan = GameObject.Find("GridTiles");
+        if (orphan != null) DestroyObjectSafe(orphan);
+
+        tileObjects = null;
+        MarkDirty();
+    }
+
+    private void EnsureWhitePlaceholder()
+    {
+        if (_whitePlaceholder != null) return;
         _whitePlaceholder = Sprite.Create(
             Texture2D.whiteTexture,
             new Rect(0, 0, 4, 4),
             new Vector2(0.5f, 0.5f),
             4f);
+    }
 
-        RenderGrid();
+    private static void DestroyObjectSafe(GameObject go)
+    {
+        if (go == null) return;
+        if (Application.isPlaying) Destroy(go);
+        else DestroyImmediate(go);
+    }
+
+    private void MarkDirty()
+    {
+#if UNITY_EDITOR
+        if (!Application.isPlaying) UnityEditor.EditorUtility.SetDirty(gameObject);
+#endif
     }
 
     private void TryBindGridManager()
@@ -63,7 +126,8 @@ private void RenderGrid()
     {
         GridData data = gridManager.GetGridData();
 
-        var parent = new GameObject("GridTiles");
+        gridTilesParent = new GameObject("GridTiles");
+        var parent = gridTilesParent;
         tileObjects = new GameObject[data.Width, data.Height];
 
         for (int x = 0; x < data.Width; x++)
