@@ -67,6 +67,9 @@ public class MonsterArchetype
     public int   HpCostPerMoveRandomMax            { get; set; }
     public bool  UseRandomMoveHpCost               { get; set; }
     public int   HpHealPerAbsorb                   { get; set; }
+    public int   HpCostCooldownMoves               { get; set; } // moves required between each HpCostPerMove deduction
+    public int   EcologyActionCooldownMoves        { get; set; } // moves required between absorb/release (must move ≥1)
+    public float SpawnMoveDelayMaxSeconds          { get; set; } // newborn (flower-spawned) startup delay upper bound
 
     public float AbsorbReleaseTickSeconds          { get; set; }
     public float MoveTickSeconds                   { get; set; }
@@ -79,6 +82,7 @@ public class MonsterArchetype
     public int   BudAbsorbRadius                   { get; set; }
     public int   BudToFlowerNutrient               { get; set; }
     public int   BudHpDecayPerTick                 { get; set; }
+    public int   BudStarvationCooldownTicks        { get; set; } // consecutive no-absorb Bud ticks before losing 1 HP
     public float BudTickSeconds                    { get; set; }
 
     // Flower stage
@@ -118,26 +122,28 @@ public class MonsterArchetype
         HpCostPerMoveRandomMin            = 1,
         HpCostPerMoveRandomMax            = 2,
         UseRandomMoveHpCost               = false, // v1: fixed HpCostPerMove for debugging lifecycle pacing
-        HpHealPerAbsorb                   = 2,     // ~offsets two moves; shows "absorb sustains life" without being too strong
+        HpHealPerAbsorb                   = 1,     // absorb heals only 1 (can't keep moss permanently full → Bud can still trigger)
+        HpCostCooldownMoves               = 2,     // lose 1 HP every 2 moves (net ~ -1 HP per 4-move absorb/release cycle)
+        EcologyActionCooldownMoves        = 2,     // every 2 moves → at most 1 absorb/release (can't churn in place)
+        SpawnMoveDelayMaxSeconds          = 2.0f,  // flower-born slimes start moving after random(0, this) seconds
 
         AbsorbReleaseTickSeconds          = 1.0f,  // v1: kept separate per stage (Slime/Bud/Flower may differ later); not merged
         MoveTickSeconds                   = 1.0f,
-        // ===== v1 Moss nutrient contract =====
-        // KeepNutrientOnRelease == BudRequiredNutrient (both = 2), but semantics differ:
-        //   BudRequiredNutrient  = lifecycle gate: at natural death, Nutrient>=this → transform to Bud.
-        //   KeepNutrientOnRelease = ecology floor: while alive, release must keep Nutrient >= this.
-        // Release behavior MUST guarantee Nutrient never drops below KeepNutrientOnRelease (protects breeding reserve).
-        // Ladder (cap=3): <=1 absorb / ==2 stable reserve, no release / ==3 release 1 back to 2.
-        //   death: Nutrient>=2 → Bud ; Nutrient<2 → StarvationFailed.
-        // Kept as a separate field so other NutrientCarriers can decouple these two later.
+        // ===== v1 Moss nutrient ladder (closer to original; no stable death-point) =====
+        // Nutrient <=1 → absorb 1 from an adjacent Soil that HAS nutrient (>0), and heal.
+        // Nutrient >=2 → release surplus to an adjacent Soil that HAS nutrient (>0), keeping KeepNutrientOnRelease(1).
+        // This oscillates 1<->2 so the moss keeps foraging/depositing (no stable-at-2 lock-up).
+        // BudRequiredNutrient(2) is ONLY the death→Bud gate, NOT a permanent reserve.
+        // (No averaging / no "find poorest"; never release onto a 0-nutrient tile.)
         AbsorbWhenNutrientLessOrEqual     = 1,
-        ReleaseWhenNutrientGreaterOrEqual = 3,
-        KeepNutrientOnRelease             = 2,
+        ReleaseWhenNutrientGreaterOrEqual = 2,
+        KeepNutrientOnRelease             = 1,
 
         BudMaxHP                          = 10,
         BudAbsorbRadius                   = 2,
         BudToFlowerNutrient               = 8,
         BudHpDecayPerTick                 = 1,
+        BudStarvationCooldownTicks        = 3,     // 3 consecutive no-absorb ticks → -1 HP (absorb-tick never costs HP)
         BudTickSeconds                    = 1.0f,
 
         FlowerMaxHP                       = 21,
@@ -223,6 +229,16 @@ public class MonsterData
     public SlimeLifecycleStage Stage { get; private set; }
     public void SetLifecycleStage(SlimeLifecycleStage stage) => Stage = stage;
 
+    // Consecutive Bud ticks with no absorption (gates Bud HP decay; reset on absorb or after a deduction).
+    public int BudStarveCounter { get; private set; }
+    public void RegisterBudStarve() => BudStarveCounter++;
+    public void ResetBudStarve() => BudStarveCounter = 0;
+
+    // Newborn startup delay: until Time.time reaches SpawnReadyTime, the slime idles (no move/ecology/HP).
+    public float SpawnReadyTime { get; private set; }
+    public void SetSpawnDelay(float seconds) => SpawnReadyTime = Time.time + Mathf.Max(0f, seconds);
+    public bool IsSpawnDelayed() => Time.time < SpawnReadyTime;
+
     // Lifecycle transform (TASK-064): switch stage and reset the HP pool to the new stage's max.
     // Carried Nutrient/Magic are preserved (Bud/Flower keep accumulating).
     public void TransformTo(SlimeLifecycleStage stage, int maxHp)
@@ -239,6 +255,13 @@ public class MonsterData
     // ===== Grid position (per-monster identity; multiple monsters may share a cell — no collision volume) =====
     public Vector2Int Position { get; private set; }
     public void SetPosition(Vector2Int p) => Position = p;
+
+    // Move counters gating ecology actions and HP cost (each reset independently when its action fires).
+    public int MovesSinceEcology { get; private set; }
+    public int MovesSinceHpCost  { get; private set; }
+    public void RegisterMove() { MovesSinceEcology++; MovesSinceHpCost++; }
+    public void ResetEcologyCounter() => MovesSinceEcology = 0;
+    public void ResetHpCostCounter() => MovesSinceHpCost = 0;
 
     public MonsterData(MonsterArchetype archetype)
     {

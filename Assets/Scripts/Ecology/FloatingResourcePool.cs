@@ -15,6 +15,6 @@ public static class FloatingResourcePool
         if (n == 0 && m == 0) return;
         TotalNutrient += n;
         TotalMagic    += m;
-        Debug.Log($"[Resource] FloatingPool deposit: +N={n} +M={m} (reason: {reason}); pool now N={TotalNutrient} M={TotalMagic}");
+        // (Console log removed to avoid spam; slime ecology events are captured by SlimeEcologyDiagnostics file.)
     }
 }

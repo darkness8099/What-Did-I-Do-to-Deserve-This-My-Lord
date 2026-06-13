@@ -3594,3 +3594,80 @@ GridData → GridManager → GridRenderer → InputHandler（挖掘）
 - **验证（A 类，未进 Play）**：refresh 0 Error；execute_code：同格 2 只、穿插移入、两侧随机拐弯、死路回头、随机出生朝向、花同格繁殖 5 只；三控制器均含 Death 状态。
 - **边界**：未改场景结构（已有组件，新串行字段取默认）；未进 Play Mode；未跑 git。
 - **C 类（交用户复验）**：连续滑动移动 / 互相穿插 / 撞墙随机拐弯·死路回头 / 吸放·死亡动画 / 转化落格 / 花后代同格出生。
+
+### 2026-06-13 养分规则修正 — 消除"卡在 2"死点（按 Wiki + 实测）
+
+- **问题**：旧规则 `Release>=3, Keep=2` 导致史莱姆很快稳定在 Nutrient=2 后不吸不放（出生填满到 3→吐一次到 2→永久发呆），"搬运养分"未真正发生。
+- **修正（`MonsterArchetype.Slime`）**：`ReleaseWhenNutrientGreaterOrEqual` 3→2、`KeepNutrientOnRelease` 2→1（`NutrientCapacity=3` / `AbsorbWhenNutrientLessOrEqual=1` / `BudRequiredNutrient=2` 不变）。
+- **修正（`MonsterEcologySystem.ResolveAfterMove`）**：去掉"稳定带"；`n<=1` 从 Nutrient>0 邻土吸 1+回血，`n>=2` 向 **Nutrient>0** 邻土释放 `surplus=n-1`。释放目标改用 `HasAbsorbableNutrient`（Soil && Nutrient>0），**绝不向 0 养分土释放**；不平均化、不找最贫瘠、取首个 Nutrient>0 邻格。
+- **效果**：养分在 1↔2 持续震荡，吸放动画持续可见；`BudRequiredNutrient=2` 仅作死亡→Bud 门槛。
+- **验证（A 类，未进 Play）**：refresh 0 Error；execute_code 7 项全过：① n=1+邻有养分→吸到2+回血+邻-1；② n=2→放、留1、邻+1；③ n=3→放2留1；④ n≥2+濒死→Bud；⑤ n=1+濒死→StarvationFailed；⑥ 周围无养分→不吸不放；⑦ 只有 0 养分邻土→不释放、该土仍 0。
+- **同步**：`GAME_DESIGN_SLIME.md` §3.2 阶梯表 + §8 数值表。
+- **边界**：未改场景；未进 Play Mode；未跑 git。
+
+### 2026-06-13 养分调参 — 生态行为冷却 + 释放目标随机
+
+- **生态冷却**：新增 `MonsterArchetype.EcologyActionCooldownMoves=2`；`MonsterData.MovesSinceEcology`(+RegisterMove/ResetEcologyCounter)。`EcologyTickDriver.TickCrawling`：实际移动才 `RegisterMove`，计数 ≥ 冷却时才 `ResolveAfterMove` 并重置——每 2 格最多 1 次吸/放，且不能原地连续吸放（Wiki：一次吸放至少移动 1 格）。
+- **释放目标随机**：`MonsterEcologySystem` 释放时先收集 4 邻中 `Nutrient>0` 的候选；对 `surplus` 的每 1 点**独立随机**选一个候选 `DepositNutrient(1)`（允许重复命中、不固定一格、不找最富/最贫、绝不向 0 养分土释放）。无候选→NoReleaseTarget。
+- **验证（A 类，未进 Play）**：refresh 0 Error；execute_code：
+  - 冷却 cadence：驱动 ProcessTick 5 次，生态在第 2/4 次移动触发（n 0→1→2），t1/t3/t5 只移动不吸放；
+  - 随机释放：n=3 共 30 次试验，up/down 命中分散（32/28），16 次 1+1，每次都释放 2 留 1；
+  - 不向 0 养分土释放（只给有养分的邻格）。
+- **同步**：`GAME_DESIGN_SLIME.md` §3.2（冷却+随机）+ §8（新增 `EcologyActionCooldownMoves`）。
+- **边界**：未改场景；未进 Play Mode；未跑 git。
+- **可调**：`EcologyActionCooldownMoves`（节奏快慢）、`viewMoveSpeed`、`tickSeconds`。
+
+### 2026-06-13 HP 经济调参 + 修正转 Bud 条件（按 Wiki：吸收回血但不可永生）
+
+- **修正 bug**：之前 `ResolveNaturalDeath` 只在 `HP<=0` 判定转 Bud，与设计 §6.1（`HP<=BudHpThreshold` 即可）不符。改为：
+  - `HP<=BudHpThreshold(2)` 且 `Nutrient>=BudRequiredNutrient(2)` → **转 Bud（可在存活时触发）**；
+  - `HP<=0` 且 `Nutrient<2` → StarvationFailed；
+  - 否则继续存活衰弱。
+- **HP 经济调参**：
+  - `HpHealPerAbsorb` 2→**1**（回血偏弱，富养分区不再永生）；释放不回血；回血不超过 MaxHP。
+  - 新增 `HpCostCooldownMoves=2`：HP 改为**每移动 2 格扣 1**（不再每格扣）。`MonsterData.MovesSinceHpCost` 独立计数；`EcologyTickDriver` 次序 = 移动→（每2格）扣血→（每2格）吸放→生命周期。
+  - 完整 4 格循环：HP −2 + 吸收 +1 = **净 −1** → 健康区延缓死亡但不永生，贫瘠区更快衰弱。
+- **验证（A 类，未进 Play）**：refresh 0 Error；execute_code：HP2/N2→Bud(存活)、HP2/N1→Alive、HP0/N2→Bud、HP0/N1→StarvationFailed；满血吸收仍 21/21（回血封顶）；富养分走廊驱动 12 tick HP 16→14 缓降不卡满。
+- **同步**：`GAME_DESIGN_SLIME.md` §3.1（衰弱节奏）、§5（分流表，标记已实现 + HP<=2 触发）、§6.1（转 Bud 可存活触发）、§8（HpHealPerAbsorb=1 / 新增 HpCostCooldownMoves / BudHpThreshold 说明）。
+- **边界**：未改场景；未进 Play Mode；未跑 git。可调：`HpCostCooldownMoves` / `HpHealPerAbsorb` / `BudHpThreshold`。
+
+### 2026-06-13 临时诊断日志工具（替代 Console 刷屏）
+
+- **新增 `Assets/Scripts/Monsters/SlimeEcologyDiagnostics.cs`**（static，临时）：写本地文件 `Application.persistentDataPath/slime_ecology_diagnostics.log`，一行一条记录；开关 `Enabled`/`MaxLines`（默认 true/300）；`Begin()` 每次开局重建文件；`Area5x5` 统计 5×5 养分。事件：`[GLOBAL] [BUD_SPAWN] [BUD_TICK] [BUD_RESULT] [FLOWER_RESULT]`。
+- **频率控制**：GLOBAL 每 5s（`EcologyTickDriver.LogGlobal` 全图扫描）；BUD_SPAWN 每次转 Bud；BUD_TICK 仅在 Bud 实际吸收/扣血时（每生态 tick，非每帧）；BUD_RESULT/FLOWER_RESULT 必记；超过 MaxLines 后停止追加。
+- **开关**：`EcologyTickDriver` 新增 Inspector 字段 `enableSlimeEcologyDiagnostics`/`maxDiagnosticLines`，Start 时 `Configure+Begin`。
+- **去 Console 刷屏**：移除 `MonsterLifecycleSystem` 的 `[Lifecycle]` Debug.Log（改为结构化文件事件）；`FloatingResourcePool.Deposit` 的 per-deposit Debug.Log 静默。
+- **签名变更**：`ResolveNaturalDeath(m, monsters, grid)` 加 grid（供 5×5 统计）；驱动调用同步。
+- **验证（A 类，未进 Play）**：refresh 0 Error；execute_code 模拟 slime→Bud→Flower→繁殖 + GLOBAL，读回文件确认五类事件格式正确、一行一条。文件路径：`C:/Users/Administrator/AppData/LocalLow/DefaultCompany/What Did I Do to Deserve This My Lord/slime_ecology_diagnostics.log`。
+- **边界**：只加临时诊断；未改核心数值；未改场景；未进 Play Mode；未跑 git。
+
+### 2026-06-14 Bud 节奏修正 — 吸收不扣血 + 饥饿冷却
+
+- **问题（据诊断日志）**：Bud 即使本 tick 吸到养分仍 `hpDelta=-1`，边吸边掉血，局部养分偏少时很快枯死。
+- **修正（仅 Bud 逻辑/字段）**：
+  - 新增 `MonsterArchetype.BudStarvationCooldownTicks=3` + `MonsterData.BudStarveCounter`（RegisterBudStarve/ResetBudStarve）。
+  - `BudTick`：本 tick `absorbed>0` → 只长养分、**不扣 HP**、`reason=absorbed`、清零饥饿计数；`absorbed==0` → 饥饿计数 +1，仅当 ≥ `BudStarvationCooldownTicks` 才扣 `BudHpDecayPerTick(1)` 并清零；HP≤0 且 <8 → WitherFailed。
+  - 转 Bud 时 `ResetBudStarve()`。
+  - 未改：`BudToFlowerNutrient=8`、Flower 繁殖公式、Slime 吸放、地图初始养分。
+- **验证（A 类，未进 Play）**：refresh 0 Error；execute_code：① 吸到 HP 不降（10→10）；②③ 连续 1~2 次没吸 HP 不降、第 3 次 −1 并清零；④ 吸收成功饥饿计数清零；⑤ 累计达 8 转 Flower（6 tick）；⑥ HP≤0 且 <8 → WitherFailed。
+- **同步**：`GAME_DESIGN_SLIME.md` §6.2 + §8（新增 `BudStarvationCooldownTicks` / `BudHpDecayPerTick`）。
+- **边界**：未改场景；未进 Play Mode；未跑 git。
+
+### 2026-06-14 占位 / 落位 / 出生延迟修正
+
+- **背景（据日志）**：同坐标生成多个 Bud/Flower、新苗全堆同格 → 重叠、同片 5×5 被多 Bud 争吸、Flower 同区爆崽、局部养分被抽干。
+- **占位（一格仅 1 Bud/Flower）**：新增 `MonsterManager.HasBudOrFlowerAt(x,y)`；`ResolveNaturalDeath` 转 Bud 前检查本格无 Bud/Flower，否则不转（Crawling 继续移动到空格再转）。
+- **落位（分散，撤销"同格出生"）**：`FlowerTick` 改为按 `SpawnCells`（origin+8 邻，固定顺序）找**不同的可用格**（`IsMonsterTraversable` 且无 Bud/Flower），一格一只；不足 → `actualSpawn<plannedSpawn`，`failReason=no_space`。
+- **出生延迟**：新增 `MonsterArchetype.SpawnMoveDelayMaxSeconds=2.0` + `MonsterData.SpawnReadyTime`(SetSpawnDelay/IsSpawnDelayed)。花生每苗设 `random(0,2)s` 延迟；`EcologyTickDriver.TickCrawling` 延迟期 early-return（不移动/不吸放/不扣 HP），延迟结束转正常 Crawling。
+- **诊断**：`FlowerResult` 增加 `spawnDelays=[...]` 字段（plannedSpawn/actualSpawn/failReason/spawnDelays 齐全）。
+- **验证（A 类，未进 Play）**：refresh 0 Error；execute_code：① 同格两 slime 仅 1 转 Bud（另一 Alive）；③ planned 5 仅 3 可落格 → 实生 3、3 个不同格；④⑤ 延迟苗 3 tick 不动/HP 不变/不吸放，正常苗照动；⑥ 延迟结束后开始移动。
+- **未改**：核心吸放数值、地图养分、场景；未跑 git。
+- **同步**：`GAME_DESIGN_SLIME.md` §6.4（落位+延迟+占位）+ §8（新增 `SpawnMoveDelayMaxSeconds`）。
+
+### 2026-06-14 Flower 落位改回同格（保留延迟/占位规则）
+
+- 按用户最新指示，撤销"分散到不同格"，**改回所有新 Slime 同格生成**（魔物无碰撞，允许同格）；`actualSpawn` 一般 == `plannedSpawn`，failReason=none。
+- **保留**的其他新规则：每只新 Slime 独立随机启动延迟 `random(0,2)s`（延迟期不动/不吸放/不扣 HP）；Bud/Flower 一格仅 1（Crawling 不受限）。
+- 删除已无用的 `SpawnCells` 数组。
+- **验证（A 类，未进 Play）**：refresh 0 Error；execute_code：花繁殖 5 只全在同格、各自延迟时间不同；Bud 占位仍生效（同格两 slime 仅 1 转 Bud）。
+- **同步**：`GAME_DESIGN_SLIME.md` §6.4（落位=同格 + 延迟 + 占位）。未改场景；未跑 git。

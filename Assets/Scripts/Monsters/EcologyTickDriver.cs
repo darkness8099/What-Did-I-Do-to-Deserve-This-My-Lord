@@ -7,10 +7,17 @@ public class EcologyTickDriver : MonoBehaviour
 {
     [SerializeField] private float tickSeconds = 1.0f;
 
+    [Header("Diagnostics (temporary)")]
+    [SerializeField] private bool enableSlimeEcologyDiagnostics = true;
+    [SerializeField] private int maxDiagnosticLines = 300;
+
+    private const float GlobalLogSeconds = 5f;
+
     private MonsterManager monsters;
     private GridManager grid;
     private MonsterRenderer view;
     private float timer;
+    private float globalTimer;
     private readonly List<MonsterData> scratch = new List<MonsterData>();
 
     private void Start()
@@ -28,15 +35,45 @@ public class EcologyTickDriver : MonoBehaviour
             enabled = false;
             return;
         }
+
+        SlimeEcologyDiagnostics.Configure(enableSlimeEcologyDiagnostics, maxDiagnosticLines);
+        SlimeEcologyDiagnostics.Begin();
+
         Debug.Log("[EcologyTickDriver] Initialized.");
     }
 
     private void Update()
     {
+        globalTimer += Time.deltaTime;
+        if (globalTimer >= GlobalLogSeconds)
+        {
+            globalTimer -= GlobalLogSeconds;
+            LogGlobal();
+        }
+
         timer += Time.deltaTime;
         if (timer < tickSeconds) return;
         timer -= tickSeconds;
         ProcessTick();
+    }
+
+    // [GLOBAL] every 5s: full-grid soil-nutrient snapshot (diagnostics only; gated by Enabled).
+    private void LogGlobal()
+    {
+        if (!SlimeEcologyDiagnostics.Enabled || grid == null) return;
+        GridData gd = grid.GetGridData();
+        if (gd == null) return;
+
+        long total = 0; int nutCells = 0, soilCells = 0;
+        for (int x = 0; x < gd.Width; x++)
+            for (int y = 0; y < gd.Height; y++)
+            {
+                if (gd.GetCell(x, y) != CellType.Soil) continue;
+                soilCells++;
+                int n = gd.GetTileAttribute(x, y).Nutrient;
+                if (n > 0) { total += n; nutCells++; }
+            }
+        SlimeEcologyDiagnostics.Global(Time.time, total, nutCells, soilCells);
     }
 
     private void ProcessTick()
@@ -67,18 +104,35 @@ public class EcologyTickDriver : MonoBehaviour
 
     private void TickCrawling(MonsterData m)
     {
+        // Newborn startup delay: idle (no move / ecology / HP cost) until the delay elapses.
+        if (m.IsSpawnDelayed()) return;
+
         Vector2Int cur;
         bool moved = MonsterMovementSystem.TryMoveStep(m, grid, out cur);
-        if (moved) MonsterLifecycleSystem.ApplyMoveHpCost(m);
+        if (moved) m.RegisterMove();
 
-        EcologyAction act = MonsterEcologySystem.ResolveAfterMove(m, grid);
-        if (view != null)
+        // HP move cost on its own cadence (lose HpCostPerMove every HpCostCooldownMoves moves).
+        int hpCd = Mathf.Max(1, m.Archetype.HpCostCooldownMoves);
+        if (m.MovesSinceHpCost >= hpCd)
         {
-            if (act == EcologyAction.Absorbed) view.PlayCrawlingAction(m, true);
-            else if (act == EcologyAction.Released) view.PlayCrawlingAction(m, false);
+            MonsterLifecycleSystem.ApplyMoveHpCost(m);
+            m.ResetHpCostCounter();
         }
 
-        if (MonsterLifecycleSystem.ResolveNaturalDeath(m, monsters) == LifecycleOutcome.StarvationFailed)
+        // Ecology (absorb/release) only after accumulating enough MOVES — never churn in place, never every frame.
+        int cooldown = Mathf.Max(1, m.Archetype.EcologyActionCooldownMoves);
+        if (m.MovesSinceEcology >= cooldown)
+        {
+            EcologyAction act = MonsterEcologySystem.ResolveAfterMove(m, grid);
+            m.ResetEcologyCounter();
+            if (view != null)
+            {
+                if (act == EcologyAction.Absorbed) view.PlayCrawlingAction(m, true);
+                else if (act == EcologyAction.Released) view.PlayCrawlingAction(m, false);
+            }
+        }
+
+        if (MonsterLifecycleSystem.ResolveNaturalDeath(m, monsters, grid) == LifecycleOutcome.StarvationFailed)
             if (view != null) view.NotifyMonsterDied(m);
     }
 }

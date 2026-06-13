@@ -57,28 +57,35 @@ public static class MonsterEcologySystem
             return EcologyAction.NoAbsorbTarget; // 4 neighbors have no absorbable nutrient → no action
         }
 
-        // --- Stable reserve band (between absorb and release thresholds): do nothing ---
-        if (n < a.ReleaseWhenNutrientGreaterOrEqual)
-            return EcologyAction.Stable;
-
-        // --- High: release only the surplus above the breeding reserve; never drop below KeepNutrientOnRelease ---
-        int surplus = n - a.KeepNutrientOnRelease;
-        if (surplus <= 0) return EcologyAction.Stable;
-
-        foreach (Vector2Int dir in N4)
+        // --- High (>= release threshold): release surplus to an adjacent Soil that ALREADY has nutrient ---
+        // Keep KeepNutrientOnRelease for self. Never release onto a 0-nutrient tile; no averaging / no "find poorest".
+        if (n >= a.ReleaseWhenNutrientGreaterOrEqual)
         {
-            int cx = pos.x + dir.x;
-            int cy = pos.y + dir.y;
-            if (!grid.IsInside(cx, cy)) continue;
-            if (grid.GetCellType(cx, cy) != CellType.Soil) continue; // Empty is not a resource container
+            int surplus = n - a.KeepNutrientOnRelease;
+            if (surplus <= 0) return EcologyAction.Stable;
 
-            TileAttributeData tile = grid.GetTileAttribute(cx, cy);
-            tile.DepositNutrient(surplus);
-            grid.SetTileAttribute(cx, cy, tile);
+            // Candidate neighbors that ALREADY hold nutrient (never release onto a 0-nutrient tile).
+            var candidates = new System.Collections.Generic.List<Vector2Int>(4);
+            foreach (Vector2Int dir in N4)
+            {
+                int cx = pos.x + dir.x;
+                int cy = pos.y + dir.y;
+                if (grid.HasAbsorbableNutrient(cx, cy)) candidates.Add(new Vector2Int(cx, cy));
+            }
+            if (candidates.Count == 0) return EcologyAction.NoReleaseTarget;
+
+            // Release each surplus point to an INDEPENDENTLY random candidate (repeats allowed; not all fixed to one).
+            for (int i = 0; i < surplus; i++)
+            {
+                Vector2Int c = candidates[Random.Range(0, candidates.Count)];
+                TileAttributeData tile = grid.GetTileAttribute(c.x, c.y);
+                tile.DepositNutrient(1);
+                grid.SetTileAttribute(c.x, c.y, tile);
+            }
             monster.WithdrawNutrient(surplus);
             return EcologyAction.Released;
         }
 
-        return EcologyAction.NoReleaseTarget; // nowhere to release → hold (Nutrient unchanged)
+        return EcologyAction.Stable;
     }
 }

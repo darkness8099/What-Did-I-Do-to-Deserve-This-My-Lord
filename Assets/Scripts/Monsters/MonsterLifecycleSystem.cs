@@ -37,29 +37,41 @@ public static class MonsterLifecycleSystem
         monster.TakeDamage(Mathf.Max(0, cost));
     }
 
-    // Resolve a Crawling monster that may have died from natural decay (HP <= 0).
-    //   Nutrient >= BudRequiredNutrient → transform to Bud (stays, keeps position);
-    //   else → StarvationFailed: resources → FloatingResourcePool, removed.
-    public static LifecycleOutcome ResolveNaturalDeath(MonsterData monster, MonsterManager monsters)
+    // Crawling natural-decay resolution (checked every tick, not only on death):
+    //   HP <= BudHpThreshold AND Nutrient >= BudRequiredNutrient → transform to Bud (can trigger while still alive);
+    //   HP <= 0 AND Nutrient <  BudRequiredNutrient            → StarvationFailed (resources → FloatingResourcePool, removed);
+    //   otherwise (still alive, not yet eligible)               → Alive (keep losing HP).
+    public static LifecycleOutcome ResolveNaturalDeath(MonsterData monster, MonsterManager monsters, GridManager grid)
     {
-        if (monster == null || monster.IsAlive()) return LifecycleOutcome.Alive;
+        if (monster == null) return LifecycleOutcome.Alive;
         if (monster.Stage != SlimeLifecycleStage.Crawling) return LifecycleOutcome.Alive;
 
         MonsterArchetype a = monster.Archetype;
         Vector2Int pos = monster.Position;
 
-        if (monster.CurrentNutrient >= a.BudRequiredNutrient)
+        // Low HP + enough nutrient → bud. Only one Bud/Flower per cell: if this cell already has one,
+        // don't make a second here (the still-Crawling slime keeps moving and may bud on a free cell later).
+        if (monster.CurrentHP <= a.BudHpThreshold && monster.CurrentNutrient >= a.BudRequiredNutrient
+            && (monsters == null || !monsters.HasBudOrFlowerAt(pos.x, pos.y)))
         {
+            int hp = monster.CurrentHP, nut = monster.CurrentNutrient;
+            int areaN, areaCells; SlimeEcologyDiagnostics.Area5x5(grid, pos, out areaN, out areaCells);
             monster.SeedCollected(monster.CurrentNutrient);
             monster.TransformTo(SlimeLifecycleStage.Bud, a.BudMaxHP);
-            Debug.Log($"[Lifecycle] {monster.DisplayName}@{pos} natural decay → Bud (nutrient={monster.CurrentNutrient}).");
+            monster.ResetBudStarve();
+            SlimeEcologyDiagnostics.BudSpawn(Time.time, pos, hp, nut, areaN, areaCells);
             return LifecycleOutcome.TransformedToBud;
         }
 
-        FloatingResourcePool.Deposit(monster.CurrentNutrient, monster.CurrentMagic, $"starvation-failed:{monster.DisplayName}");
-        if (monsters != null) monsters.Remove(monster);
-        Debug.Log($"[Lifecycle] {monster.DisplayName}@{pos} StarvationFailed (nutrient<{a.BudRequiredNutrient}); resources → FloatingPool.");
-        return LifecycleOutcome.StarvationFailed;
+        // Dead with too little nutrient → starvation failure.
+        if (!monster.IsAlive())
+        {
+            FloatingResourcePool.Deposit(monster.CurrentNutrient, monster.CurrentMagic, $"starvation-failed:{monster.DisplayName}");
+            if (monsters != null) monsters.Remove(monster);
+            return LifecycleOutcome.StarvationFailed;
+        }
+
+        return LifecycleOutcome.Alive;
     }
 
     // ===== TASK-065: Bud stage =====
@@ -67,24 +79,47 @@ public static class MonsterLifecycleSystem
     {
         if (m == null || grid == null) return StageTickOutcome.StillBud;
         MonsterArchetype a = m.Archetype;
+        Vector2Int pos = m.Position;
 
-        AbsorbFromRadius(m, grid, a.BudAbsorbRadius, a.BudToFlowerNutrient);
+        int hpBefore = m.CurrentHP;
+        int absorbed = AbsorbFromRadius(m, grid, a.BudAbsorbRadius, a.BudToFlowerNutrient);
 
         if (m.CollectedNutrient >= a.BudToFlowerNutrient)
         {
+            int areaN, ac; SlimeEcologyDiagnostics.Area5x5(grid, pos, out areaN, out ac);
             m.TransformTo(SlimeLifecycleStage.Flower, a.FlowerMaxHP);
-            Debug.Log($"[Lifecycle] Bud@{m.Position} → Flower (collected={m.CollectedNutrient}).");
+            SlimeEcologyDiagnostics.BudResult(Time.time, pos, "Flower", m.CurrentHP, m.CollectedNutrient, areaN);
             return StageTickOutcome.Flowered;
         }
 
-        m.TakeDamage(a.BudHpDecayPerTick);
-        if (!m.IsAlive())
+        // Absorbed this tick → grow only, NO HP loss; reset starvation counter.
+        if (absorbed > 0)
         {
-            FloatingResourcePool.Deposit(m.CollectedNutrient + m.CurrentNutrient, m.CurrentMagic, "bud-wither-failed");
-            if (monsters != null) monsters.Remove(m);
-            Debug.Log($"[Lifecycle] Bud@{m.Position} WitherFailed (collected={m.CollectedNutrient} < {a.BudToFlowerNutrient}).");
-            return StageTickOutcome.WitherFailed;
+            m.ResetBudStarve();
+            SlimeEcologyDiagnostics.BudTick(Time.time, pos, m.CurrentHP, m.CollectedNutrient, absorbed, 0, "absorbed");
+            return StageTickOutcome.StillBud;
         }
+
+        // No food this tick → count toward starvation; only lose HP after BudStarvationCooldownTicks misses.
+        m.RegisterBudStarve();
+        int hpDelta = 0;
+        if (m.BudStarveCounter >= Mathf.Max(1, a.BudStarvationCooldownTicks))
+        {
+            m.TakeDamage(a.BudHpDecayPerTick);
+            hpDelta = m.CurrentHP - hpBefore;
+            m.ResetBudStarve();
+
+            if (!m.IsAlive())
+            {
+                int areaN2, ac2; SlimeEcologyDiagnostics.Area5x5(grid, pos, out areaN2, out ac2);
+                FloatingResourcePool.Deposit(m.CollectedNutrient + m.CurrentNutrient, m.CurrentMagic, "bud-wither-failed");
+                if (monsters != null) monsters.Remove(m);
+                SlimeEcologyDiagnostics.BudResult(Time.time, pos, "Dead", m.CurrentHP, m.CollectedNutrient, areaN2);
+                return StageTickOutcome.WitherFailed;
+            }
+        }
+
+        SlimeEcologyDiagnostics.BudTick(Time.time, pos, m.CurrentHP, m.CollectedNutrient, 0, hpDelta, "starved");
         return StageTickOutcome.StillBud;
     }
 
@@ -100,17 +135,31 @@ public static class MonsterLifecycleSystem
         m.TakeDamage(a.FlowerHpDecayPerTick);
         if (!m.IsAlive())
         {
+            int collected = m.CollectedNutrient;
             int per = Mathf.Max(1, a.NutrientPerSpawn);
-            int spawnCount = Mathf.Min(a.FlowerMaxSpawn, m.CollectedNutrient / per);
+            int spawnCount = Mathf.Min(a.FlowerMaxSpawn, collected / per);
             Vector2Int pos = m.Position;
 
+            int actual = 0;
+            var delays = new System.Collections.Generic.List<string>();
             if (monsters != null)
             {
-                monsters.Remove(m);
+                monsters.Remove(m); // free the flower's own cell first
+
+                // All offspring spawn in the flower's own cell (monsters have no collision volume).
+                // Each newborn still gets an independent random startup delay (idles before moving).
                 for (int i = 0; i < spawnCount; i++)
-                    monsters.Spawn(pos.x, pos.y, MonsterArchetype.Slime); // all in the same cell
+                {
+                    MonsterData ns = monsters.Spawn(pos.x, pos.y, MonsterArchetype.Slime);
+                    if (ns == null) continue;
+                    float d = Random.Range(0f, a.SpawnMoveDelayMaxSeconds);
+                    ns.SetSpawnDelay(d);
+                    delays.Add(d.ToString("F2"));
+                    actual++;
+                }
             }
-            Debug.Log($"[Lifecycle] Flower@{pos} reproduce: collected={m.CollectedNutrient} → spawned {spawnCount} in-cell.");
+            string fail = (actual >= spawnCount) ? "none" : "occupied";
+            SlimeEcologyDiagnostics.FlowerResult(Time.time, pos, collected, spawnCount, actual, fail, string.Join(";", delays));
             return StageTickOutcome.Reproduced;
         }
         return StageTickOutcome.StillFlower;

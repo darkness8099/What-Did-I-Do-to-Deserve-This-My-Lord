@@ -87,24 +87,29 @@ HP 与养分的关系（明确）：
 
 ## 3. 自然衰弱来源 + 养分吸收 / 释放（核心生态行为）
 
-### 3.1 衰弱来源（规则 1）
-- 基础匍匐苔藓按 **「移动 / 生态行动消耗 HP」** 处理，**不做站立全局掉血**。
-- 参考：**每移动 1 格 HP -1~2**（`HpCostPerMove`，入表）。
-- 吸收养分可恢复 HP（`HpHealPerAbsorb`），但**不会永久停止后续衰弱**（继续移动仍会掉血）。
+### 3.1 衰弱来源（规则 1，2026-06-13 调参）
+- 基础匍匐苔藓按 **「移动消耗 HP」** 处理，**不做站立全局掉血**（站着不动不掉血、也不吸放）。
+- 节奏：**每移动 `HpCostCooldownMoves`(=2) 格扣 `HpCostPerMove`(=1) HP**。
+- 吸收回血 `HpHealPerAbsorb=1`（不超过 MaxHP），**释放不回血**。**故意偏弱**：富养分区只能延缓而非阻止衰弱，否则永生→无法触发转 Bud。
+- 完整循环参考（4 格）：HP −2（两次扣血）+ 1 次吸收 +1 = **净 −1**；富养分区慢慢衰弱、贫瘠区更快衰弱。
 
-### 3.2 吸收 / 释放（养分阶梯，`NutrientCapacity = 3`）
+### 3.2 吸收 / 释放（养分阶梯，`NutrientCapacity = 3`，2026-06-13 修正：消除"卡在 2"死点）
 - 交互对象：**上下左右相邻的 Soil**（4 邻，不含斜角）。
-- 语义：**只吐出超过「繁殖储备」的多余养分**，而不是释放到 1。繁殖储备 = `BudRequiredNutrient = 2`。
-- 阶梯行为：
+- 阶梯行为（在**移动完成后 / 生态 tick** 触发，非每帧）：
   | 当前养分 | 行为 |
   |---:|---|
-  | `<= 1`（`AbsorbWhenNutrientLessOrEqual=1`） | 尝试**吸收**相邻 Soil 养分，并按 `HpHealPerAbsorb` 回血 |
-  | `== 2` | **稳定储备状态，不释放**（保住转花苞所需的繁殖储备） |
-  | `== 3`（`ReleaseWhenNutrientGreaterOrEqual=3`） | **释放 1 点**回相邻 Soil，回到 2（释放下限 `KeepNutrientOnRelease=2`，只放多余部分） |
-- 自然死亡时 `Nutrient >= 2` 才生成 Bud，否则 `StarvationFailed`（见 §5/§6.1）。
-- 这样苔藓既能作为养分载体供养环境（吐出第 3 点），又不会破坏花苞/开花/繁殖链路（始终守住 2）。
+  | `<= 1`（`AbsorbWhenNutrientLessOrEqual=1`） | 尝试从相邻 **Nutrient>0** 的 Soil **吸收 1 点**，并按 `HpHealPerAbsorb` 回血 |
+  | `>= 2`（`ReleaseWhenNutrientGreaterOrEqual=2`） | 尝试向相邻 **Nutrient>0** 的 Soil **释放多余养分**，释放后自身保留 `KeepNutrientOnRelease=1` |
+- 因此养分会在 **1↔2 之间持续震荡**（n=2 放到 1，n=1 又吸到 2），苔藓持续吸放、不会卡死；`n=3` 一次释放 2 点回到 1。
+- **关键约束（按原作 / 用户实测修正）**：
+  - 释放与吸收的目标 **都要求 Soil 且 Nutrient>0**；**绝不向 Nutrient=0 的土释放**。
+  - **不做"富土搬到贫土"的平均化**，**不找最贫瘠土块**——只在 4 邻里取第一个 `Nutrient>0` 的 Soil。
+  - 周围没有 `Nutrient>0` 土块时：不吸也不放（NoAbsorbTarget / NoReleaseTarget）。
+  - **生态行为冷却**（`EcologyActionCooldownMoves=2`）：每移动 2 格最多触发 1 次吸/放；计数只在**实际移动**时累计，**不能原地连续吸放**（Wiki：一次吸放至少移动 1 格）。
+  - **释放目标随机**：从 4 邻里 `Nutrient>0` 的土中**随机**选；`surplus>1` 时每 1 点**独立随机**一次目标（允许重复命中，但不固定全给同一格、不找最富/最贫）。
+- `BudRequiredNutrient=2` **仅是死亡→转 Bud 的门槛**，不是平时必须保留的储备（平时下限是 `KeepNutrientOnRelease=1`）。
+- 自然死亡时 `Nutrient >= 2` 才转 Bud，否则 `StarvationFailed`（见 §5/§6.1）。
 - `Empty` Tile **不是资源容器**，禁止写入 Nutrient / Magic（资源只存在于 Soil）。
-- 注：`KeepNutrientOnRelease` 当前 == `BudRequiredNutrient`（都=繁殖储备 2）；实现时释放下限以「繁殖储备」为准，二者可后续合并为单一字段。
 
 代码现状：`MonsterData.AbsorbFromTile` 仅生成时吸满；无周期吸放、无释放回 Soil 的怪物侧入口、无 HP 恢复 → 全部待建（见 §7）。
 
@@ -126,11 +131,11 @@ HP 与养分的关系（明确）：
 |---|---|---|---|
 | 被勇者杀死 | `HeroKill` | `ScatterOrdinaryDeathResources` 回流周围 Soil | ✅ 已实现 |
 | 被捕食 | `PredatorEat` | `TransferResourcesToPredator` 进捕食者，不回流 | ✅ API 已实现 |
-| 苔藓 HP 归零 且 `Nutrient>=2` 且 `HP<=BudHpThreshold` | `LifecycleTransform` | **转花苞**，不回流 | ❌ 未实现 |
-| 苔藓 HP 归零 但 `Nutrient<2` | **StarvationFailed** | **不转花苞、不生成 Slime**；剩余资源进 `FloatingResourcePool`（待后续蘑菇/空气资源机制） | ❌ 未实现 |
-| 花苞 HP 归零 但养分未达阈值 | **WitherFailed** | **不生成 Slime**；剩余资源进 `FloatingResourcePool` | ❌ 未实现 |
-| 花苞养分达标 | — | `Bud → Flower`，**不算死亡** | ❌ 未实现 |
-| 花 HP 归零 | `LifecycleWither` | **繁殖结算**生成新苔藓（见 §6.4），**不调用普通死亡回流** | ❌ 未实现 |
+| 苔藓 `HP<=BudHpThreshold(2)` 且 `Nutrient>=2` | `LifecycleTransform` | **转花苞**（**可在存活时触发**，不必等 HP≤0），不回流 | ✅ 已实现 |
+| 苔藓 `HP<=0` 且 `Nutrient<2` | **StarvationFailed** | **不转花苞、不生成 Slime**；剩余资源进 `FloatingResourcePool`（待后续蘑菇/空气资源机制） | ✅ 已实现 |
+| 花苞 HP 归零 但养分未达阈值 | **WitherFailed** | **不生成 Slime**；剩余资源进 `FloatingResourcePool` | ✅ 已实现 |
+| 花苞养分达标 | — | `Bud → Flower`，**不算死亡** | ✅ 已实现 |
+| 花 HP 归零 | `LifecycleWither` | **繁殖结算**生成新苔藓（见 §6.4），**不调用普通死亡回流** | ✅ 已实现 |
 
 **架构红线（已被现有代码保障）**：`ResourceFlow.AllowsOrdinaryDeathScatter` 只放行 `HeroKill`/`EnvironmentDeath`。
 故 `HP<=0 → ScatterOrdinaryDeathResources` 不会对衰弱/捕食/生命周期误触发。
@@ -141,20 +146,28 @@ HP 与养分的关系（明确）：
 
 ## 6. 生命周期详规
 
-### 6.1 转花苞条件（规则 2）
+### 6.1 转花苞条件（规则 2，2026-06-13 修正：可在存活时触发）
 ```text
-if CurrentNutrient >= 2
-   and CurrentHP <= BudHpThreshold        // BudHpThreshold 参考 2，入配置，不写死
-   and 自然衰弱致死（移动/行动耗尽 HP）
-→ TransformToBud（LifecycleTransform，不回流）
+每 tick 检查（不必等死）：
+if CurrentHP <= BudHpThreshold(2)
+   and CurrentNutrient >= BudRequiredNutrient(2)
+→ TransformToBud（LifecycleTransform，不回流；HP 重置为 BudMaxHP，保留养分进 CollectedNutrient）
+
+否则 if CurrentHP <= 0 and CurrentNutrient < 2 → StarvationFailed
+否则 → 继续存活、继续衰弱
 ```
+即「养分足够的虚弱苔藓」会主动结苞，而不是非得耗到 HP≤0。
 养分不足（`<2`）即便衰弱致死也**不转花苞** → 走 §5 的 `StarvationFailed`。
 
 ### 6.2 花苞阶段 Bud（美术：`veg_plant_growth_*`，默认满帧 `veg_plant_growth_09`；枯萎 `veg_plant_death_*`）
 - 不移动、不攻击；**有 HP**。
 - 从**周围 2 格范围（5×5）**吸收养分（`budAbsorbRadius=2`）。
-- 累计养分 `>= BudToFlowerNutrient`（参考 **8**，入配置）→ 转化为花。
-- 若**吸不到足够养分且 HP 归零** → **WitherFailed**：枯萎失败，不生成 Slime，剩余资源进 `FloatingResourcePool`。
+- **HP 节奏（2026-06-14 修正，避免边吸边掉血枯太快）**：
+  - 本 tick **吸到养分** → 只累计 `CollectedNutrient`、**不扣 HP**、`reason=absorbed`、饥饿计数清零；
+  - 本 tick **没吸到** → 饥饿计数 +1；只有连续 `BudStarvationCooldownTicks(=3)` 次没吸到才 **−`BudHpDecayPerTick`(1) HP** 并清零计数；
+  - 吸收成功或扣血后都重置饥饿计数。
+- 累计养分 `>= BudToFlowerNutrient`（**8**，本次不改）→ 转化为花。
+- **吸不到养分、饥饿累积致 HP≤0** 且未达 8 → **WitherFailed**：不生成 Slime，剩余资源进 `FloatingResourcePool`。
 
 ### 6.3 花阶段 Flower（美术：`veg_flower_bloom_*`，默认 `veg_flower_bloom_05`；枯萎 `veg_flower_death_*`）
 - 不作为普通移动怪；**有 HP**。
@@ -170,11 +183,10 @@ if CurrentNutrient >= 2
   ```
   - `FlowerMaxSpawn` 参考 **5**（入配置）。
   - `NutrientPerSpawn` 参考 **2**（入配置）。
-- 落位规则：
-  - origin = Flower 所在格。
-  - **优先 origin 本格**，其余按**固定顺序**寻找周围可通行（`Empty`、无怪）格。
-  - **不把多个 Slime 堆在同一格**（当前 `MonsterManager` 字典按格唯一，不支持堆叠）。
-  - 可通行格不足时，实际生成数 < spawnCount（多余名额作废）。
+- 落位规则（2026-06-14 最终：**同格生成**，靠延迟错开而非分散落位）：
+  - **所有新 Slime 都生成在花自身格**（魔物无碰撞体积，允许同格）；`actualSpawn` 通常 == `plannedSpawn`，`failReason=none`。
+  - **每只新 Slime 设独立随机启动延迟** `random(0, SpawnMoveDelayMaxSeconds=2)`：延迟期间待机（不移动 / 不吸放 / 不扣 HP），延迟结束才进入正常 Crawling。靠延迟错开"逐渐散开"，而非一帧爆散。
+- **占位规则**：**同一格只允许 1 个 Bud 或 Flower**（新生 Crawling Slime 不受此限，可同格）。Slime 转 Bud 前检查本格是否已有 Bud/Flower；若有则不转（继续 Crawling 移动，到空格再转）。
 
 ---
 
@@ -207,19 +219,24 @@ if CurrentNutrient >= 2
 | 参数 | 参考值 | 说明 |
 |---|---|---|
 | `NutrientCapacity` | 3 | 匍匐苔藓个体养分上限 |
-| `HpCostPerMove` | 1~2 | 每移动 1 格扣 HP（衰弱唯一来源） |
-| `HpHealPerAbsorb` | 待定 | 每次吸收养分恢复的 HP |
-| `AbsorbWhenNutrientLessOrEqual` | 1 | 养分 ≤ 此值 → 吸收 |
-| `ReleaseWhenNutrientGreaterOrEqual` | 3 | 养分 ≥ 此值 → 释放多余（只放到繁殖储备） |
-| `KeepNutrientOnRelease` | 2 | 释放下限 ＝ 繁殖储备（== `BudRequiredNutrient`） |
-| `BudRequiredNutrient` | 2 | 自然死亡时养分 ≥ 此值 → 转花苞（繁殖储备） |
-| `BudHpThreshold` | 2 | HP≤此值且养分≥2 且自然衰弱 → 转花苞 |
+| `HpCostPerMove` | 1 | 每次 HP 消耗扣的量（衰弱唯一来源） |
+| `HpCostCooldownMoves` | 2 | 每移动几格扣 1 次 HP（仅按实际移动计数） |
+| `HpHealPerAbsorb` | 1 | 每次吸收回的 HP（**不超过 MaxHP**；故意偏弱，避免富养分区永生 → 仍能触发转 Bud） |
+| `AbsorbWhenNutrientLessOrEqual` | 1 | 养分 ≤ 此值 → 从 Nutrient>0 邻土吸 1 + 回血 |
+| `ReleaseWhenNutrientGreaterOrEqual` | 2 | 养分 ≥ 此值 → 向 Nutrient>0 邻土释放多余（**释放不回血**） |
+| `KeepNutrientOnRelease` | 1 | 释放后自身保留（平时下限，非繁殖储备） |
+| `BudRequiredNutrient` | 2 | 转花苞所需养分门槛（非平时保留量） |
+| `EcologyActionCooldownMoves` | 2 | 每移动几格才允许 1 次吸/放（仅按实际移动计数） |
+| `BudHpThreshold` | 2 | **HP ≤ 此值且养分 ≥ BudRequiredNutrient → 转花苞（可在存活时触发，不必等 HP≤0）** |
 | `BudToFlowerNutrient` | 8 | 花苞累计养分达此值 → 转花 |
 | `budAbsorbRadius` | 2（5×5） | 花苞吸养分范围 |
+| `BudHpDecayPerTick` | 1 | 花苞饥饿扣血量 |
+| `BudStarvationCooldownTicks` | 3 | 连续几次没吸到养分才扣 1 次 HP（吸到则不扣、并清零） |
 | `flowerAbsorbRadius` | 3（7×7） | 花吸养分范围 |
 | `FlowerMaxAbsorb` | 11 | 花 `CollectedNutrient` 上限 |
 | `FlowerMaxSpawn` | 5 | 单朵花繁殖上限 |
 | `NutrientPerSpawn` | 2 | 每只新苔藓消耗的养分 |
+| `SpawnMoveDelayMaxSeconds` | 2.0 | 花生新苗的随机启动延迟上限（random(0,此)，延迟期待机） |
 
 ---
 

@@ -55,6 +55,18 @@ public class MonsterManager : MonoBehaviour
         return null;
     }
 
+    // True if any monster at (x,y) is a Bud or Flower (only one plant allowed per cell).
+    public bool HasBudOrFlowerAt(int x, int y)
+    {
+        for (int i = 0; i < monsters.Count; i++)
+        {
+            MonsterData m = monsters[i];
+            if (m.Position.x != x || m.Position.y != y) continue;
+            if (m.Stage == SlimeLifecycleStage.Bud || m.Stage == SlimeLifecycleStage.Flower) return true;
+        }
+        return false;
+    }
+
     public void Remove(MonsterData m)
     {
         if (m != null) monsters.Remove(m);
