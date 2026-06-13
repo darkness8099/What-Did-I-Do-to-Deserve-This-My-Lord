@@ -285,7 +285,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 842122851f4586d46b095645aa29c6b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  spriteSlime: {fileID: 21300000, guid: 15e63a66740fb4f4f89dec46de7f0168, type: 3}
+  slimePrefab: {fileID: 0}
+  spriteSlime: {fileID: 21300000, guid: 62e9e6792a72d6342a217ebdb7a858f7, type: 3}
+  acCrawling: {fileID: 0}
+  acBud: {fileID: 0}
+  acFlower: {fileID: 0}
 --- !u!114 &1519096725
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -764,6 +768,7 @@ GameObject:
   - component: {fileID: 2000000031}
   - component: {fileID: 1519096723}
   - component: {fileID: 1519096724}
+  - component: {fileID: 2000000032}
   m_Layer: 0
   m_Name: MonsterManager
   m_TagString: Untagged
@@ -786,6 +791,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 2000000001}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2000000032
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2000000030}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7c35885307460064cb97394616226a6c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  tickSeconds: 1
 --- !u!1 &2000000040
 GameObject:
   m_ObjectHideFlags: 0

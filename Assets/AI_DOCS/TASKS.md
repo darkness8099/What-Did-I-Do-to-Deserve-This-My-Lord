@@ -89,7 +89,7 @@
 - [x] **TASK-029C** — 在 `Assets/Art/` 下创建分类空目录骨架（含 `_Incoming/`），仅 `.gitkeep` 占位
 - [x] **TASK-029D** — 选 1–2 张测试 sprite 走完整流程：进 `_Incoming/` → 命名 → 设 Import Setting → 移动到 `Art/Tiles/`
 - [x] **TASK-029E-pre** — 全量导入剩余 4 张（入口 / 勇者 / 史莱姆 / Demon Lord），完成初始 Art 目录填充
-- [ ] **TASK-029E** — Prefab 自动化实验：用 1 个 Slime sprite 生成 `Slime.prefab`，让 `MonsterRenderer` 改为实例化模式
+- [x] **TASK-029E** — Prefab 自动化实验：用 1 个 Slime sprite 生成 `Slime.prefab`，让 `MonsterRenderer` 改为实例化模式
 - [x] **TASK-029E-pre2** — Visual Prefab 试验：用已导入 sprite 创建第一批仅含 `SpriteRenderer` 的视觉 Prefab（不改场景、不改 gameplay 脚本）
 - [ ] **TASK-029F** — UI 自动部署实验：用 1 张 victory panel 替换 `MVPResultUI` 的纯文字
 - [x] **TASK-030** — `GridRenderer` 接入 Soil sprite（`tile_soil_surface_00` / `tile_soil_deep_00`），替换 Soil 格纯色 Quad 渲染
@@ -135,11 +135,28 @@
 
 ---
 
+## 阶段 10：匍匐苔藓 / 史莱姆生态实现（设计见 `GAME_DESIGN_SLIME.md`）
+
+- [x] **TASK-058** — 编写 `GAME_DESIGN_SLIME.md`：匍匐苔藓生命周期（衰弱来源 / 吸放 / 移动 / 转花苞 / 花苞 / 花 / 繁殖 / 资源分流）正式成文
+- [x] **TASK-059** — Slime/Moss 数值入表：`MonsterArchetype` 扩充生命周期字段（HP·养分·Bud·Flower·繁殖·tick），`NutrientCapacity` 5→3，新增枚举值 `MonsterEcologyRole.NutrientCarrier`、`MonsterMoveStrategy.StraightUntilWall`、`SlimeSpawnOriginPriority`，Slime 填入保守模板值。**仅字段占位，未实现行为逻辑**
+- [x] **TASK-060** — `SlimeLifecycleStage { Crawling, Bud, Flower }` 枚举 + `MonsterData.Stage`（默认 Crawling）+ `SetLifecycleStage()`；数值定稿（`HpHealPerAbsorb=2`、`HpCostPerMove=1` 固定、Tick 均 1.0 不合并、`InitialHP=16`）；`KeepNutrientOnRelease` 保留独立 + v1 约束注释。仅字段/状态铺垫，无转化行为
+- [x] **TASK-061** — Grid 侧数据 + 邻格查询（**不接史莱姆行为**）：确认 `TileAttributeData.Nutrient/Magic` 已存在（无需新增）；`GridManager.GetNeighborCells4`（非分配，buffer 版）/ `TryGetNeighborCells4`（List 版）；`GridData.HasAbsorbableNutrient` + `GridManager.HasAbsorbableNutrient`（派生：`IsSoil && Nutrient>0`，无额外 bool）。每次最多访问 4 邻格
+- [x] **TASK-062** — Slime/Moss 规则移动：新增 `MonsterMovementSystem`（`ComputeNextStep` 纯决策：直行/遇阻按固定顺序转向/被困不动；`TryMoveStep` 整合 grid+manager）；`MonsterData.MoveDirection` + setter；`MonsterManager.MoveMonster`（字典改键、不堆叠）+ `MonsterMoved` 事件（即"移动完成"hook，供 063 接生态检测）。**无寻路/无每帧；不扣 HP/不吸放**。execute_code 全用例验证。⚠️ 尚未接 tick 驱动/场景，游戏内还不会动（驱动需新增 MonoBehaviour 入场景，待批准）
+- [x] **TASK-063** — 移动完成后的生态检测：新增 `MonsterEcologySystem`（`ResolveAfterMove`/`ResolveAt` + `EcologyAction` 枚举）+ `MonsterData.Heal`。4 邻：`<=1` 从有养分的 Soil 吸 1 点并回血（`HpHealPerAbsorb`）/ `==2` 不动 / `>=3` 向相邻 Soil 释放多余（`surplus=n-KeepNutrientOnRelease`，不低于 Keep）；无可吸养分/无 Soil 可释放则不动作。阈值全读 archetype。execute_code 全用例验证。挂接点＝`MonsterManager.MonsterMoved`（待 tick 驱动订阅）
+- [x] **TASK-064** — HP 移动消耗 + `InitialHP` 出生值 + 自然死亡分流：`MonsterData` 出生 HP 改用 `InitialHP`(16,非 MaxHP 21) + `TransformTo(stage,maxHp)`；新增 `MonsterLifecycleSystem`（`ApplyMoveHpCost` 固定/可随机 + `ResolveNaturalDeath` + `LifecycleOutcome`）：Crawling 死亡时 `Nutrient>=BudRequiredNutrient` → 转 Bud(重置 HP=BudMaxHP，保留养分)；否则 StarvationFailed（剩余进 `FloatingResourcePool`、移除）。**不走普通死亡回流**。execute_code 全用例验证
+- [x] **TASK-065** — 花苞 Bud：`MonsterLifecycleSystem.BudTick`——5×5(`BudAbsorbRadius`)环形吸收进 `CollectedNutrient`，达 `BudToFlowerNutrient(8)` → `TransformTo(Flower)`；每 tick 扣 `BudHpDecayPerTick`，HP 归零未达阈值 → WitherFailed（资源进 FloatingPool、移除）。Crawling→Bud 时 `SeedCollected`。execute_code 验证（6 tick 转花）
+- [x] **TASK-066** — 花 Flower：`FlowerTick`——7×7(`FlowerAbsorbRadius`)吸收(上限 `FlowerMaxAbsorb=11`)，每 tick 扣 `FlowerHpDecayPerTick`，HP 归零 → 繁殖结算 `spawnCount=min(FlowerMaxSpawn,⌊Collected/NutrientPerSpawn⌋)`，`ReproduceSlimes` 按 origin+4 邻固定顺序放新 Crawling（不堆叠）。execute_code 验证（生成 5 只）
+- [x] **TASK-067** — Bud/Flower 阶段渲染：建 `AC_Bud`(`anim_plant_growth`)/`AC_Flower`(`anim_flower_bloom`)；`MonsterRenderer` 按 `Stage` 切 AnimatorController + `SyncViews`（增/删/重定位/换阶段）+ 订阅 `MonsterMoved` 平滑移位
+- [x] **TASK-068** — 生态 tick 驱动 + 场景接线：新增 `EcologyTickDriver`（固定 1.0s：每怪按阶段派发 移动→扣血→吸放→死亡分流 / Bud / Flower，再 `SyncViews`）；已加到场景 `MonsterManager` 物体并保存 GameScene。**至此可进 Play Mode 试玩完整生命周期**
+- [x] **TASK-069** — 史莱姆移动动画实装（视觉层先行）：新建 `Assets/Animations/Monsters/AC_Slime.controller`（默认 `anim_slime_move`，循环）；`Slime.prefab` / `PF_Monster_Slime_Default.prefab` 加 `Animator`，Visual 默认帧 `monster_slime_move_00`；9 个 clip 资产核对通过（均绑 `Visual/m_Sprite`、无空帧）。事件驱动动画（attack/death/absorb/emit、植物/花）待对应行为/生命周期逻辑接入
+
+---
+
 ## 编号维护说明
 
 - `TASKS.md` 以“当前真实任务状态”为准。
 - `AI_WORKFLOW_LOG.md` 中旧的“后续建议任务”如果与后续正式编号冲突，应视为历史建议，不再作为编号依据。
-- 当前最新已落档任务为 `TASK-047`，后续新任务从 `TASK-048` 起顺延。
+- 当前最新已落档任务为 `TASK-069`，后续新任务从 `TASK-070` 起顺延。（阶段 10 已完成 061→068：Grid 数据/邻格 → 规则移动 → 移动后生态检测 → HP/出生/死亡分流 → Bud → Flower → 阶段渲染 → tick 驱动+场景接线；TASK-069 移动动画为视觉层先行。整条匍匐苔藓生命周期已可进 Play Mode 试玩）
 
 ---
 

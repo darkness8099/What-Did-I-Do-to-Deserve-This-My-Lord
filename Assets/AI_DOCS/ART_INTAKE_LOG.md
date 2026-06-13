@@ -43,3 +43,20 @@
 - 当**部分接入**（保留 N 件，退回 M 件），件数填实际接入数，处理结果说明退回部分。
 - 批次较大或包含多类资源时，可拆成多行（每个类别一行）。
 - 详细处理过程不写在本表里，写到 `AI_WORKFLOW_LOG.md` 的对应 TASK 条目。
+
+---
+
+## 2026-06-13 slime_animation_pack_v1
+
+| Date | Batch | Count | Category | Result | Operator |
+|---|---|---:|---|---|---|
+| 2026-06-13 | slime_animation_pack_v1 - Monsters | 17 | Monsters | OK - Imported Slime frames to `Art/Characters/Monsters/Slime/`: `monster_slime_move_00..04`, `monster_slime_absorb_00..05`, `monster_slime_death_00..05`; default idle frame is `monster_slime_move_00`. | AI assist |
+| 2026-06-13 | slime_animation_pack_v1 - Vegetation | 28 | Monsters / Slime lifecycle | OK - Imported plant / flower frames to `Art/Characters/Monsters/Slime/{Plants,Flowers}/`: `veg_plant_growth_00..09`, `veg_plant_death_00..05`, `veg_flower_bloom_00..05`, `veg_flower_death_00..05`; plant default is `veg_plant_growth_09`, flower default is `veg_flower_bloom_05`. | AI assist |
+| 2026-06-13 | slime_animation_pack_v1 - AnimationClips | 9 | Animations | OK - Added `Assets/Animations/Monsters/` and `Assets/Animations/Vegetation/`; Slime attack reuses move frames, Slime emit uses absorb frames in reverse order. | AI assist |
+| 2026-06-13 | slime_animation_pack_v1 - Reclassify lifecycle art | 28 moved | Monsters / Slime lifecycle | OK - Moved `Plants` and `Flowers` folders from `Art/Backgrounds_Props/Vegetation/` into `Art/Characters/Monsters/Slime/` because they are Slime lifecycle products rather than generic vegetation. AnimationClip references preserved through Unity AssetDatabase move. | AI assist |
+
+## 2026-06-13 legacy_slime_idle_cleanup_v1
+
+| Date | Batch | Count | Category | Result | Operator |
+|---|---|---:|---|---|---|
+| 2026-06-13 | legacy_slime_idle_cleanup_v1 | 1 删除 | Monsters | OK - 删除旧测试素材 `monster_slime_idle_00`（连同 .meta）。删除前已把唯二引用重指向到新默认帧 `monster_slime_move_00`：`PF_Monster_Slime_Default.prefab` 的 SpriteRenderer 与 `GameScene` 内 `MonsterRenderer.spriteSlime`。验证：Console 0 Error，全工程 0 残留 GUID 引用。 | AI 协助 |

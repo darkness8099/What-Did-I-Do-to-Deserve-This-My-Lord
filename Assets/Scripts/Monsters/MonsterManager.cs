@@ -1,96 +1,93 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+// Per-monster storage (each MonsterData carries its own Position). Multiple monsters MAY share a cell:
+// monsters have no collision volume and can interpenetrate (fix #1); flower offspring all spawn in one cell (fix #4).
 public class MonsterManager : MonoBehaviour
 {
+    private static readonly Vector2Int[] Dirs4 =
+    {
+        new Vector2Int(0, 1), new Vector2Int(0, -1), new Vector2Int(-1, 0), new Vector2Int(1, 0),
+    };
+
     private GridManager gridManager;
-    private Dictionary<Vector2Int, MonsterData> monsters;
+    private readonly List<MonsterData> monsters = new List<MonsterData>();
 
     private void Start()
     {
         gridManager = GetComponent<GridManager>();
+        if (gridManager == null) gridManager = FindObjectOfType<GridManager>();
         if (gridManager == null)
-            gridManager = FindObjectOfType<GridManager>();
-
-        if (gridManager == null)
-        {
             Debug.LogError("[MonsterManager] GridManager not found in scene.");
-            return;
-        }
-
-        monsters = new Dictionary<Vector2Int, MonsterData>();
         Debug.Log("[MonsterManager] Initialized.");
     }
 
-    public bool CanPlaceMonster(int x, int y)
-    {
-        if (!gridManager.IsInside(x, y))
-        {
-            Debug.LogWarning($"[MonsterManager] CanPlaceMonster: ({x},{y}) is out of bounds.");
-            return false;
-        }
-
-        if (gridManager.GetCellType(x, y) != CellType.Empty)
-            return false;
-
-        if (HasMonster(x, y))
-            return false;
-
-        return true;
-    }
-
-    public bool PlaceMonster(int x, int y, MonsterArchetype archetype)
+    // Spawn a monster at (x,y) with a random initial facing (fix #5). Stacking allowed.
+    public MonsterData Spawn(int x, int y, MonsterArchetype archetype)
     {
         if (archetype == null)
         {
-            Debug.LogWarning("[MonsterManager] PlaceMonster: archetype is null. Skipped.");
-            return false;
+            Debug.LogWarning("[MonsterManager] Spawn: archetype is null. Skipped.");
+            return null;
         }
-        if (!CanPlaceMonster(x, y))
-            return false;
-
-        monsters[new Vector2Int(x, y)] = new MonsterData(archetype);
-        Debug.Log($"[MonsterManager] {archetype.DisplayName} placed at ({x},{y}).");
-        return true;
+        var data = new MonsterData(archetype);
+        data.SetPosition(new Vector2Int(x, y));
+        data.SetMoveDirection(Dirs4[Random.Range(0, Dirs4.Length)]);
+        monsters.Add(data);
+        return data;
     }
 
-    public bool PlaceSlime(int x, int y) => PlaceMonster(x, y, MonsterArchetype.Slime);
+    public bool PlaceMonster(int x, int y, MonsterArchetype archetype) => Spawn(x, y, archetype) != null;
+    public bool PlaceSlime(int x, int y) => Spawn(x, y, MonsterArchetype.Slime) != null;
 
     public bool HasMonster(int x, int y)
     {
-        return monsters != null && monsters.ContainsKey(new Vector2Int(x, y));
+        for (int i = 0; i < monsters.Count; i++)
+            if (monsters[i].Position.x == x && monsters[i].Position.y == y) return true;
+        return false;
     }
 
+    // First monster occupying (x,y) (used by combat / hero targeting). Null if none.
     public MonsterData GetMonster(int x, int y)
     {
-        var key = new Vector2Int(x, y);
-        if (monsters != null && monsters.TryGetValue(key, out var data))
-            return data;
+        for (int i = 0; i < monsters.Count; i++)
+            if (monsters[i].Position.x == x && monsters[i].Position.y == y) return monsters[i];
         return null;
     }
 
-public Vector2Int? FindNearestMonsterInRange(Vector2Int heroPos, float range)
+    public void Remove(MonsterData m)
     {
-        if (monsters == null || monsters.Count == 0) return null;
-
-        Vector2Int? nearest = null;
-        float nearestDist = float.MaxValue;
-        foreach (var pos in monsters.Keys)
-        {
-            float dist = Mathf.Abs(pos.x - heroPos.x) + Mathf.Abs(pos.y - heroPos.y);
-            if (dist <= range && dist < nearestDist)
-            {
-                nearest = pos;
-                nearestDist = dist;
-            }
-        }
-        return nearest;
+        if (m != null) monsters.Remove(m);
     }
-
 
     public bool RemoveMonster(int x, int y)
     {
-        var key = new Vector2Int(x, y);
-        return monsters != null && monsters.Remove(key);
+        MonsterData m = GetMonster(x, y);
+        if (m == null) return false;
+        monsters.Remove(m);
+        return true;
+    }
+
+    // Snapshot all monsters into `buffer` (cleared first) so callers can iterate while the list mutates.
+    public void CollectAll(List<MonsterData> buffer)
+    {
+        if (buffer == null) return;
+        buffer.Clear();
+        buffer.AddRange(monsters);
+    }
+
+    public int Count => monsters.Count;
+
+    public Vector2Int? FindNearestMonsterInRange(Vector2Int heroPos, float range)
+    {
+        Vector2Int? nearest = null;
+        float nearestDist = float.MaxValue;
+        for (int i = 0; i < monsters.Count; i++)
+        {
+            Vector2Int pos = monsters[i].Position;
+            float dist = Mathf.Abs(pos.x - heroPos.x) + Mathf.Abs(pos.y - heroPos.y);
+            if (dist <= range && dist < nearestDist) { nearest = pos; nearestDist = dist; }
+        }
+        return nearest;
     }
 }

@@ -7,7 +7,7 @@ using UnityEngine;
 public enum MonsterEcologyRole
 {
     None,
-    Carrier,
+    NutrientCarrier, // basic moss/slime nutrient carrier (formerly "Carrier"; merged to remove duplicate)
     Consumer,
     Predator,
     Magical,
@@ -18,11 +18,26 @@ public enum MonsterEcologyRole
 public enum MonsterMoveStrategy
 {
     Static,
+    StraightUntilWall, // straight line, only turns on wall collision (Slime/Moss); behavior not yet implemented
     RandomWalk,
     WallFollow,
     SeekResource,
     SeekFood,
     Flee,
+}
+
+// Flower reproduction spawn placement order (data placeholder; behavior not yet implemented)
+public enum SlimeSpawnOriginPriority
+{
+    OriginThenNeighborsFixedOrder,
+}
+
+// Lifecycle stage of a moss/slime line (TASK-060 scaffolding; transitions/behavior not yet implemented)
+public enum SlimeLifecycleStage
+{
+    Crawling, // 匍匐苔藓 — base moving nutrient carrier
+    Bud,      // 花苞
+    Flower,   // 花
 }
 
 // ===== Archetype: stable identity + base stats. The single source of truth for "what kind of monster this is". =====
@@ -38,23 +53,103 @@ public class MonsterArchetype
     public float               AttackRange          { get; set; }
     public int                 NutrientCapacity     { get; set; }
     public int                 MagicCapacity        { get; set; }
-    public int                 HungerMax            { get; set; }
+    public int                 HungerMax            { get; set; } // reserved; v1 NOT used — Slime/Moss decay is via HpCostPerMove (see below)
     public TileElementType     SpawnElement         { get; set; }
+
+    // ===== Lifecycle / ecology tuning (Slime/Moss; see GAME_DESIGN_SLIME.md). =====
+    // Data placeholders only — behavior is NOT implemented yet. Numbers live here, never hard-coded in behavior logic.
+    public int   InitialHP                         { get; set; }
+    public int   BudRequiredNutrient               { get; set; }
+    public int   BudHpThreshold                    { get; set; }
+
+    public int   HpCostPerMove                     { get; set; }
+    public int   HpCostPerMoveRandomMin            { get; set; }
+    public int   HpCostPerMoveRandomMax            { get; set; }
+    public bool  UseRandomMoveHpCost               { get; set; }
+    public int   HpHealPerAbsorb                   { get; set; }
+
+    public float AbsorbReleaseTickSeconds          { get; set; }
+    public float MoveTickSeconds                   { get; set; }
+    public int   AbsorbWhenNutrientLessOrEqual     { get; set; }
+    public int   ReleaseWhenNutrientGreaterOrEqual { get; set; }
+    public int   KeepNutrientOnRelease             { get; set; }
+
+    // Bud stage
+    public int   BudMaxHP                          { get; set; }
+    public int   BudAbsorbRadius                   { get; set; }
+    public int   BudToFlowerNutrient               { get; set; }
+    public int   BudHpDecayPerTick                 { get; set; }
+    public float BudTickSeconds                    { get; set; }
+
+    // Flower stage
+    public int   FlowerMaxHP                       { get; set; }
+    public int   FlowerAbsorbRadius                { get; set; }
+    public int   FlowerMaxAbsorb                   { get; set; }
+    public int   FlowerHpDecayPerTick              { get; set; }
+    public float FlowerTickSeconds                 { get; set; }
+
+    // Flower reproduction
+    public int                      FlowerMaxSpawn      { get; set; }
+    public int                      NutrientPerSpawn    { get; set; }
+    public SlimeSpawnOriginPriority SpawnOriginPriority { get; set; }
+    public bool                     AllowStackSpawn     { get; set; }
 
     // Slime: basic nutrient-carrier. MagicCapacity intentionally 0.
     public static readonly MonsterArchetype Slime = new MonsterArchetype
     {
         Id               = "slime",
         DisplayName      = "Slime",
-        Role             = MonsterEcologyRole.Carrier,
-        Move             = MonsterMoveStrategy.Static,
-        BaseMaxHP        = 10,
+        Role             = MonsterEcologyRole.NutrientCarrier,
+        Move             = MonsterMoveStrategy.StraightUntilWall,
+        BaseMaxHP        = 21,
         BaseAttack       = 2,
         AttackRange      = 1.0f,
-        NutrientCapacity = 5,
+        NutrientCapacity = 3,
         MagicCapacity    = 0,
         HungerMax        = 10,
         SpawnElement     = TileElementType.Slime,
+
+        // ----- Lifecycle / ecology tuning (conservative v1; see GAME_DESIGN_SLIME.md) -----
+        InitialHP                         = 16,
+        BudRequiredNutrient               = 2,
+        BudHpThreshold                    = 2,
+
+        HpCostPerMove                     = 1,
+        HpCostPerMoveRandomMin            = 1,
+        HpCostPerMoveRandomMax            = 2,
+        UseRandomMoveHpCost               = false, // v1: fixed HpCostPerMove for debugging lifecycle pacing
+        HpHealPerAbsorb                   = 2,     // ~offsets two moves; shows "absorb sustains life" without being too strong
+
+        AbsorbReleaseTickSeconds          = 1.0f,  // v1: kept separate per stage (Slime/Bud/Flower may differ later); not merged
+        MoveTickSeconds                   = 1.0f,
+        // ===== v1 Moss nutrient contract =====
+        // KeepNutrientOnRelease == BudRequiredNutrient (both = 2), but semantics differ:
+        //   BudRequiredNutrient  = lifecycle gate: at natural death, Nutrient>=this → transform to Bud.
+        //   KeepNutrientOnRelease = ecology floor: while alive, release must keep Nutrient >= this.
+        // Release behavior MUST guarantee Nutrient never drops below KeepNutrientOnRelease (protects breeding reserve).
+        // Ladder (cap=3): <=1 absorb / ==2 stable reserve, no release / ==3 release 1 back to 2.
+        //   death: Nutrient>=2 → Bud ; Nutrient<2 → StarvationFailed.
+        // Kept as a separate field so other NutrientCarriers can decouple these two later.
+        AbsorbWhenNutrientLessOrEqual     = 1,
+        ReleaseWhenNutrientGreaterOrEqual = 3,
+        KeepNutrientOnRelease             = 2,
+
+        BudMaxHP                          = 10,
+        BudAbsorbRadius                   = 2,
+        BudToFlowerNutrient               = 8,
+        BudHpDecayPerTick                 = 1,
+        BudTickSeconds                    = 1.0f,
+
+        FlowerMaxHP                       = 21,
+        FlowerAbsorbRadius                = 3,
+        FlowerMaxAbsorb                   = 11,
+        FlowerHpDecayPerTick              = 4,
+        FlowerTickSeconds                 = 1.0f,
+
+        FlowerMaxSpawn                    = 5,
+        NutrientPerSpawn                  = 2,
+        SpawnOriginPriority               = SlimeSpawnOriginPriority.OriginThenNeighborsFixedOrder,
+        AllowStackSpawn                   = false,
     };
 }
 
@@ -113,9 +208,37 @@ public class MonsterData
     public int NutrientCapacity   => Archetype.NutrientCapacity;
     public int MagicCapacity      => Archetype.MagicCapacity;
 
-    // Hunger — field reserved for future ecology tick
+    // Collected nutrient accumulator for Bud/Flower stages (uncapped by NutrientCapacity; Bud→Flower & reproduction use it). TASK-065/066.
+    public int CollectedNutrient { get; private set; }
+    public void SeedCollected(int amount) => CollectedNutrient = Mathf.Max(0, amount);
+    public void AddCollected(int amount) { if (amount > 0) CollectedNutrient += amount; }
+
+    // Hunger — reserved, NOT used in v1. Slime/Moss natural decay is driven by MonsterArchetype.HpCostPerMove
+    // (HP consumed per move), per design rule "先按移动/生态行动消耗 HP". Kept in case hunger-based decay returns.
     public int Hunger    { get; private set; }
     public int HungerMax => Archetype.HungerMax;
+
+    // ===== Lifecycle stage (TASK-060 scaffolding) =====
+    // Default Crawling at spawn. Stage transitions (→Bud/→Flower) are driven by future lifecycle logic, not here.
+    public SlimeLifecycleStage Stage { get; private set; }
+    public void SetLifecycleStage(SlimeLifecycleStage stage) => Stage = stage;
+
+    // Lifecycle transform (TASK-064): switch stage and reset the HP pool to the new stage's max.
+    // Carried Nutrient/Magic are preserved (Bud/Flower keep accumulating).
+    public void TransformTo(SlimeLifecycleStage stage, int maxHp)
+    {
+        Stage     = stage;
+        MaxHP     = Mathf.Max(1, maxHp);
+        CurrentHP = MaxHP;
+    }
+
+    // ===== Movement facing (TASK-062) — for rule-based straight-until-wall movement =====
+    public Vector2Int MoveDirection { get; private set; }
+    public void SetMoveDirection(Vector2Int dir) => MoveDirection = dir;
+
+    // ===== Grid position (per-monster identity; multiple monsters may share a cell — no collision volume) =====
+    public Vector2Int Position { get; private set; }
+    public void SetPosition(Vector2Int p) => Position = p;
 
     public MonsterData(MonsterArchetype archetype)
     {
@@ -126,12 +249,18 @@ public class MonsterData
         }
         Archetype       = archetype;
         MaxHP           = archetype.BaseMaxHP;
-        CurrentHP       = archetype.BaseMaxHP;
+        // Spawn at InitialHP (not full MaxHP) when configured; fall back to MaxHP. (TASK-064)
+        CurrentHP       = archetype.InitialHP > 0
+            ? Mathf.Clamp(archetype.InitialHP, 1, MaxHP)
+            : MaxHP;
         Attack          = archetype.BaseAttack;
         AttackRange     = archetype.AttackRange;
         CurrentNutrient = 0;
         CurrentMagic    = 0;
-        Hunger          = 0;
+        Hunger           = 0;
+        CollectedNutrient = 0;
+        Stage            = SlimeLifecycleStage.Crawling;
+        MoveDirection    = Vector2Int.right;
     }
 
     public bool IsAlive() => CurrentHP > 0;
@@ -144,6 +273,13 @@ public class MonsterData
             return;
         }
         CurrentHP = Mathf.Max(0, CurrentHP - damage);
+    }
+
+    // Heal up to MaxHP (TASK-063: absorbing nutrient restores HP). Negative/zero ignored.
+    public void Heal(int amount)
+    {
+        if (amount <= 0) return;
+        CurrentHP = Mathf.Min(MaxHP, CurrentHP + amount);
     }
 
     // Absorb resources from a tile up to remaining capacity. tile is modified by ref.

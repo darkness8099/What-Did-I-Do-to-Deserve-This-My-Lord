@@ -73,7 +73,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 10
-  m_Sprite: {fileID: 21300000, guid: 15e63a66740fb4f4f89dec46de7f0168, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 62e9e6792a72d6342a217ebdb7a858f7, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -94,6 +94,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3062757324923117188}
   - component: {fileID: 7311782449579876882}
+  - component: {fileID: 8051641315606012203}
   m_Layer: 0
   m_Name: PF_Monster_Slime_Default
   m_TagString: Untagged
@@ -130,3 +131,24 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   archetypeId: slime
+--- !u!95 &8051641315606012203
+Animator:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9054196067295045654}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 55294e5ee1c08d24e8f7ae3979ce281c, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0

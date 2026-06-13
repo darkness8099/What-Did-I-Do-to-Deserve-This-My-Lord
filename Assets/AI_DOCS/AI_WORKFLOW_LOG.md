@@ -3247,3 +3247,350 @@ GridData → GridManager → GridRenderer → InputHandler（挖掘）
   - 本条日志条目
 - **未做**：未改任何代码 / Scene / Prefab / 美术；未执行 git
 - **Console**：0 error / 0 warning（保持前状态）
+---
+
+### 2026-06-13 TASK-029E — Slime Prefab 实例化接入
+
+- **任务目标**：
+  - 将 Slime 表现从 `MonsterRenderer` 运行时手动 `new GameObject + SpriteRenderer` 改为优先实例化 prefab。
+  - 创建正式路径 `Assets/Prefabs/Monsters/Slime.prefab`，使用已导入的 `monster_slime_idle_00` sprite。
+
+- **实际完成内容**：
+  - 新增 `Assets/Prefabs/Monsters/Slime.prefab`
+    - Root 名称：`Slime`
+    - Root 组件：`MonsterIdentity`
+    - 子对象：`Visual`
+    - `Visual` 组件：`SpriteRenderer`
+    - Sprite：`Assets/Art/Characters/Monsters/monster_slime_idle_00.png`
+    - `sortingOrder = 10`
+  - 修改 `Assets/Scripts/Monsters/MonsterRenderer.cs`
+    - 新增 `slimePrefab` 引用字段
+    - 默认优先从 `Assets/Prefabs/Monsters/Slime.prefab` 加载 prefab
+    - 找不到新 prefab 时回退到旧 `Assets/Prefabs/PF_Monster_Slime_Default.prefab`
+    - 若 prefab 仍不可用，则保留旧的 `SpriteRenderer` 临时创建 fallback
+    - `CreateMonsterView()` 改为实例化视图对象，再统一设置父级、名称、位置、缩放
+  - 修改 `Assets/AI_DOCS/TASKS.md`
+    - `TASK-029E` 标记为完成
+
+- **验证结果**：
+  - Unity Editor 状态：ready，未进入 Play Mode，未编译中
+  - Prefab 结构验证：`Slime/Visual` 两级结构，Root 有 `MonsterIdentity`，`Visual` 有 `SpriteRenderer`
+  - Prefab 数据验证：`archetypeId = "slime"`，sprite = `monster_slime_idle_00`
+  - Console：0 Error / 0 Warning
+
+- **Console 额外说明**：
+  - 本轮开始时看到的 Error 来自一次不支持的 MCP 查询：`Unknown or unsupported command type: get_prefab_stage`
+  - 该错误由工具接口触发，不是项目代码、Prefab、场景或编译错误；后续 Domain Reload / Console 检查已确认 0 Error
+
+- **边界说明**：
+  - 未进入 Play Mode
+  - 未保存 Scene
+  - 未修改 ProjectSettings / Packages / Assets/Settings
+  - 未执行 git
+  - 未直接编辑 Scene / Prefab YAML，Prefab 由 Unity Editor API 生成
+
+---
+
+### 2026-06-13 slime_animation_pack_v1 - Slime / Plant / Flower animation asset import
+
+- Source folder:
+  - `D:\Game Developer Tools\Game Art Drops\animantion\slime`
+
+- Imported PNG frames:
+  - `Assets/Art/Characters/Monsters/Slime/`
+    - `monster_slime_move_00..04` from `slime_move_frames_48x48`
+    - `monster_slime_absorb_00..05` from `slime_absorb_collapse_48x48`
+    - `monster_slime_death_00..05` from `death_animation_frames_48x48/slime_death`
+  - `Assets/Art/Characters/Monsters/Slime/Plants/`
+    - `veg_plant_growth_00..09` from `slime_growth_48x48`
+    - `veg_plant_death_00..05` from `death_animation_frames_48x48/plant_death`
+  - `Assets/Art/Characters/Monsters/Slime/Flowers/`
+    - `veg_flower_bloom_00..05` from `flower_bloom_48x48`
+    - `veg_flower_death_00..05` from `death_animation_frames_48x48/flower_death_updated`
+
+- Default frame mapping requested by user:
+  - Slime default idle: source `slime_move_00_48x48` -> `monster_slime_move_00`
+  - Plant default: source `10_maturing_plant_48x48` -> `veg_plant_growth_09`
+  - Flower default: source `06_full_bloom_48x48` -> `veg_flower_bloom_05`
+  - `Assets/Prefabs/Monsters/Slime.prefab` SpriteRenderer was updated to `monster_slime_move_00`.
+
+- AnimationClip assets created:
+  - `Assets/Animations/Monsters/anim_slime_move.anim`
+  - `Assets/Animations/Monsters/anim_slime_attack.anim`
+  - `Assets/Animations/Monsters/anim_slime_absorb.anim`
+  - `Assets/Animations/Monsters/anim_slime_emit.anim`
+  - `Assets/Animations/Monsters/anim_slime_death.anim`
+  - `Assets/Animations/Vegetation/anim_plant_growth.anim`
+  - `Assets/Animations/Vegetation/anim_flower_bloom.anim`
+  - `Assets/Animations/Vegetation/anim_plant_death.anim`
+  - `Assets/Animations/Vegetation/anim_flower_death.anim`
+
+- Animation rules applied:
+  - Slime attack uses the same frame sequence as `slime_move_frames_48x48`: `monster_slime_move_00..04`.
+  - Slime absorb uses `monster_slime_absorb_00..05`.
+  - Slime emit uses the absorb frames in reverse order: `monster_slime_absorb_05..00`.
+
+- Import settings:
+  - Texture Type: Sprite
+  - Sprite Mode: Single
+  - PPU: 48
+  - Filter Mode: Point
+  - Compression: Uncompressed
+  - Mip Maps: Off
+  - Alpha Is Transparency: true
+  - Wrap Mode: Clamp
+
+- Validation:
+  - Imported 45 PNG files and created 9 `.anim` clips.
+  - `_Incoming` has no remaining PNG files from this batch.
+  - Verified clip frame order by reading object reference curves through Unity Editor API.
+  - Console: 0 Error / 0 Warning.
+  - Active scene `GameScene` remained `isDirty=false`.
+
+- Boundaries:
+  - Did not enter Play Mode.
+  - Did not run scene/gameplay tests.
+  - Did not save Scene.
+  - Did not modify `ProjectSettings`, `Packages`, build settings, or `Assets/Settings`.
+  - Did not run git.
+
+---
+
+### 2026-06-13 slime_animation_pack_v1 - Reclassify plant / flower lifecycle frames under Slime
+
+- **Reason**:
+  - User clarified that plant and flower frames are Slime lifecycle products in this game's design, so they should be classified under the Slime monster asset folder instead of generic vegetation.
+
+- **Moved folders via Unity AssetDatabase**:
+  - `Assets/Art/Backgrounds_Props/Vegetation/Plants`
+    -> `Assets/Art/Characters/Monsters/Slime/Plants`
+  - `Assets/Art/Backgrounds_Props/Vegetation/Flowers`
+    -> `Assets/Art/Characters/Monsters/Slime/Flowers`
+
+- **Validation**:
+  - `Assets/Art/Characters/Monsters/Slime/Plants`: 16 PNG
+  - `Assets/Art/Characters/Monsters/Slime/Flowers`: 12 PNG
+  - Vegetation lifecycle AnimationClips now reference the new Slime paths.
+  - Existing generic vegetation files remain in `Assets/Art/Backgrounds_Props/Vegetation`.
+  - Console: 0 Error / 0 Warning.
+  - Active scene `GameScene` remained `isDirty=false`.
+
+- **Boundaries**:
+  - Did not enter Play Mode.
+  - Did not run scene/gameplay tests.
+  - Did not save Scene.
+  - Did not run git.
+
+---
+
+### 2026-06-13 legacy_slime_idle_cleanup — 删除旧测试史莱姆素材并重指向默认帧
+
+- **原因**：
+  - 史莱姆动画包导入后，新默认帧为 `monster_slime_move_00`；旧测试素材 `monster_slime_idle_00` 需删除。
+
+- **删除前依赖核查（只读）**：
+  - 旧素材 GUID `15e63a66740fb4f4f89dec46de7f0168` 被两处引用：
+    - `Assets/Prefabs/PF_Monster_Slime_Default.prefab`（SpriteRenderer.m_Sprite）
+    - `Assets/Scenes/GameScene.unity`（`MonsterRenderer.spriteSlime`，运行时 `sr.sprite = spriteSlime`）
+  - 代码无按名字硬编码 idle_00（仅无关的 `surface_tree_a_idle_00`）。
+
+- **执行（全部经 Unity MCP，AssetDatabase 一致）**：
+  1. 重指向 prefab SpriteRenderer.sprite → `monster_slime_move_00`（GUID `62e9e6792a72d6342a217ebdb7a858f7`）。
+  2. 重指向场景 `MonsterRenderer.spriteSlime` → `monster_slime_move_00`，并保存 GameScene（用户明确授权该次存盘）。
+  3. `manage_asset(delete)` 删除 `monster_slime_idle_00.png`（连带 .meta）。
+
+- **验证**：
+  - Console 0 Error / 0 Warning（仅 MCP 客户端连接日志）。
+  - 全工程 grep GUID `15e63a66...` → 0 残留；旧文件已不存在。
+  - prefab 与场景 MonsterRenderer 均指向 `move_00`。
+
+- **边界**：
+  - 未进 Play Mode；未跑 gameplay 测试；未执行 git。
+  - 本次按用户明确要求保存了 GameScene（删除引用所必需）。
+
+---
+
+### 2026-06-13 TASK-058 — 匍匐苔藓 / 史莱姆生态设计文档
+
+- 新增 `Assets/AI_DOCS/GAME_DESIGN_SLIME.md`（v2）：把用户口述的匍匐苔藓规则正式成文。
+- 涵盖：定位（养分系 Carrier，仅 Nutrient）、生命周期状态机、衰弱来源（移动耗 HP）、养分吸放（4 邻、低吸高放、保留≥1、吸收回血）、移动（直线撞墙转向）、死亡/捕食/生命周期分流、转花苞/花苞(5×5)/花(7×7)/繁殖公式与落位、配置参数表、实现任务拆分。
+- 同步在 `AGENTS.md` 必读清单加入一行路径引用。
+- 未改代码 / 场景 / git。
+
+### 2026-06-13 TASK-059 — Slime/Moss 数值入表（字段占位，未实现行为）
+
+- **修改文件**：`Assets/Scripts/Monsters/MonsterData.cs`
+- **枚举（新增，不删旧值，零破坏）**：
+  - `MonsterEcologyRole.NutrientCarrier`（Carrier 保留为通用别名）
+  - `MonsterMoveStrategy.StraightUntilWall`
+  - 新增 `enum SlimeSpawnOriginPriority { OriginThenNeighborsFixedOrder }`
+- **`MonsterArchetype` 扩充生命周期字段**（规则 8：数值入表，不写死行为）：
+  InitialHP / BudRequiredNutrient / BudHpThreshold / HpCostPerMove(+RandomMin/Max/UseRandom) / HpHealPerAbsorb /
+  AbsorbReleaseTickSeconds / MoveTickSeconds / AbsorbWhenNutrientLessOrEqual / ReleaseWhenNutrientGreaterOrEqual / KeepNutrientOnRelease /
+  Bud{MaxHP,AbsorbRadius,ToFlowerNutrient,HpDecayPerTick,TickSeconds} /
+  Flower{MaxHP,AbsorbRadius,MaxAbsorb,HpDecayPerTick,TickSeconds} /
+  FlowerMaxSpawn / NutrientPerSpawn / SpawnOriginPriority / AllowStackSpawn
+- **Slime 模板值**：Role=NutrientCarrier, Move=StraightUntilWall, BaseMaxHP=21, InitialHP=16, NutrientCapacity 5→3, MagicCapacity=0,
+  BudRequiredNutrient=2, BudHpThreshold=2, HpCostPerMove=1(UseRandom=false,1~2), HpHealPerAbsorb=1,
+  Absorb<=1 / Release>=2 / Keep=1, Bud(MaxHP=10,r=2,→8,decay=1,tick=1.0), Flower(MaxHP=21,r=3,maxAbsorb=11,decay=4,tick=1.0),
+  FlowerMaxSpawn=5, NutrientPerSpawn=2, SpawnOriginPriority=OriginThenNeighborsFixedOrder, AllowStackSpawn=false。
+- **验证（A 类）**：
+  - `refresh_unity(force, scripts, compile)` → 域重载后自动恢复，editor ready。
+  - `read_console(error,warning)` → 0 Error / 0 Warning（仅 MCP 连接日志）。
+  - `execute_code` 读回 `MonsterArchetype.Slime` 全部字段，值与模板一致；引用这些字段的测试代码可编译 = 字段确实存在。
+- **边界**：仅数值/字段占位，未实现任何行为逻辑（移动/吸放/生命周期/繁殖均未接）；未进 Play Mode；未存盘场景；未跑 git。
+- **注**：`BaseMaxHP` 现为 21，`MonsterData` 当前仍以 `BaseMaxHP` 设 CurrentHP；`InitialHP=16` 为占位字段，待后续行为任务接入。
+
+### 2026-06-13 TASK-059 后续 — 字段冲突 / 冗余清理
+
+- **背景**：在实现行为前，检查既有字段与新加生命周期字段的冲突/冗余。
+- **已合并/清理（`MonsterData.cs`）**：
+  1. 删除 `MonsterEcologyRole.Carrier`（新增 `NutrientCarrier` 后旧值 0 引用，纯重复）；Slime 用 `NutrientCarrier`。枚举数 8→7。
+  2. 标注 `Hunger` / `HungerMax` 为 **v1 不使用**：Slime/Moss 衰弱改由 `HpCostPerMove`（移动消耗）驱动；因设计规则「先按移动消耗 HP」，保留字段以备将来，不删除。
+  3. 同步 `GAME_DESIGN_SLIME.md` §0 角色文案 Carrier→NutrientCarrier。
+- **验证**：refresh 后 0 Error；`execute_code` 确认 `hasCarrier=false`、`Role=NutrientCarrier`、模板数值（21/3/1/8/11/5…）保留。
+- **待用户定的设计冲突（未改，仅记录）**：
+  - `ReleaseWhenNutrientGreaterOrEqual=2` 与 `BudRequiredNutrient=2` + `NutrientCapacity=3` 冲突：≥2 即释放到剩 1，苔藓难以在自然死亡时持有 ≥2 养分 → 花苞/花链路几乎走不到，绝大多数落 `StarvationFailed`。建议把释放阈值改为 3（仅满容量才释放），使吸放中性点=2=转花苞所需，待用户确认。
+- **边界**：仅字段/注释整理，无行为逻辑；未进 Play Mode；未存盘；未跑 git。
+
+### 2026-06-13 TASK-059 后续2 — 养分阶梯定稿（吸放语义）
+
+- 用户确认 `ReleaseWhenNutrientGreaterOrEqual` 2→3，并明确语义为「只吐出超过繁殖储备的多余养分」。
+- **`MonsterData.cs` Slime 模板**：`ReleaseWhenNutrientGreaterOrEqual=3`、`KeepNutrientOnRelease` 1→**2**（释放下限＝繁殖储备＝`BudRequiredNutrient`）。
+- 养分阶梯（cap=3）：`<=1` 吸收 / `==2` 稳定储备不释放 / `==3` 释放 1 回到 2；自然死亡 `>=2` 才转 Bud，否则 StarvationFailed。
+- 同步 `GAME_DESIGN_SLIME.md` §3.2（阶梯表）、§8（用代码字段名替换 `releaseKeepMin`，补 Absorb/Release/Keep/BudRequired 行）、§9（移除已解决项）。
+- **验证**：refresh 0 Error；`execute_code` 读回 Cap=3 / Absorb<=1 / Release>=3 / Keep=2 / BudRequired=2。
+- **冗余提示**：`KeepNutrientOnRelease == BudRequiredNutrient`（都=2 繁殖储备），实现时以繁殖储备为准，后续可合并为单一字段。
+- 边界：仅数值/文档；无行为逻辑；未进 Play Mode；未存盘；未跑 git。
+
+### 2026-06-13 TASK-069 — 史莱姆移动动画实装 + 动画资产核对
+
+- **目标**：让史莱姆在游戏里真正循环播放移动动画，供用户亲自试玩。
+- **资产核对（只读）**：9 个 clip 全部健康——均绑定 `Visual/m_Sprite`、无空帧；帧数 move5/attack5/absorb6/emit6/death6/plant_growth10/plant_death6/flower_bloom6/flower_death6；仅 `anim_slime_move` 循环（正确）。
+- **MonsterRenderer 现状**：已是实例化 prefab 模式（`CreateViewInstance → Instantiate(slimePrefab)`）；场景 `slimePrefab=NULL` → 运行时 `LoadDefaultPrefabIfNeeded` 加载 `Assets/Prefabs/Monsters/Slime.prefab`。两 prefab 结构均 `root→Visual(SpriteRenderer)`，匹配 clip 的 `path:Visual`。→ 无需改代码 / 改场景。
+- **实装（经 Unity MCP execute_code）**：
+  1. 新建 `Assets/Animations/Monsters/AC_Slime.controller`（`CreateAnimatorControllerAtPathWithClip`，默认状态 = `anim_slime_move`，clip 自带 `m_LoopTime=1` → 循环）。
+  2. `Slime.prefab` 与 `PF_Monster_Slime_Default.prefab` 各加 `Animator`（controller=AC_Slime, applyRootMotion=false），Visual 默认帧设为 `monster_slime_move_00`。
+- **踩坑记录**：execute_code 里 `GetComponent<Animator>() ?? AddComponent<...>()` 的 `??` 不识别 Unity 伪 null → 必须显式 `== null`；另外访问 `anim` 须在 `UnloadPrefabContents` 之前（卸载后对象被销毁）。
+- **验证（A 类）**：read_console 0 Error；execute_code 确认 AC_Slime defaultState=anim_slime_move、loops=True；两 prefab `Animator=True / ctrl=AC_Slime / VisualSprite=move_00`。
+- **C 类（交用户）**：进 Play Mode 挖掘生成史莱姆，确认其循环播放移动动画。
+- **未做 / 下一步**：事件驱动动画（attack/death/absorb/emit、植物/花）需要控制器状态机 + 触发器 + 行为/生命周期逻辑（CombatSystem 死亡、生态 tick 等），本轮未接。
+- **边界**：未进 Play Mode；未存盘场景（无需）；未跑 git。
+
+### 2026-06-13 TASK-060 — 生命周期阶段字段 + v1 数值定稿
+
+- **数值定稿（用户确认）**：`HpHealPerAbsorb` 1→2（吸一次约抵两次移动消耗）；`HpCostPerMove=1` 固定、`UseRandomMoveHpCost=false`（调试期不随机）；4 个 `*TickSeconds` 暂保留 1.0 各自独立（不合并，Slime/Bud/Flower 后续节奏可能不同）；`InitialHP=16`（出生 HP ≠ BaseMaxHP=21，待出生逻辑接入）。
+- **`KeepNutrientOnRelease` 保留不合并**（用户决定）：与 `BudRequiredNutrient` 语义不同——前者=活着时释放下限（生态行为），后者=死亡转 Bud 门槛（生命周期）；v1 两者都=2。在 `MonsterData.cs` Slime 模板处补「v1 Moss 养分契约」注释，明确 `KeepNutrientOnRelease == BudRequiredNutrient` 及释放不得低于 `KeepNutrientOnRelease`。
+- **TASK-060（`MonsterData.cs`）**：
+  - 新增 `enum SlimeLifecycleStage { Crawling, Bud, Flower }`。
+  - `MonsterData.Stage`（默认 `Crawling`，private set）+ `SetLifecycleStage(stage)`；ctor 初始化 `Stage = Crawling`。
+  - 仅状态字段铺垫，转化/行为未实现。
+- **验证（A 类）**：refresh 0 Error；`execute_code` 读回所有定稿数值 + `new MonsterData().Stage==Crawling`、枚举 `Crawling,Bud,Flower`。
+- **边界**：未进 Play Mode；未存盘场景；未跑 git。
+- **下一步**：TASK-061（养分释放回 Soil + 吸收回血，遵守 KeepNutrientOnRelease 下限）。
+
+### 2026-06-13 TASK-061 — Grid 侧养分数据确认 + 4 邻格查询（不接史莱姆行为）
+
+- **任务顺序按用户重排**（旧 061「只在 MonsterData 做吸放方法」作废）：吸放必须依赖 Grid 土块养分、挂在「移动完成后」检测，而非孤立数值函数 / 每帧扫描。新顺序 061 数据/邻格 → 062 规则移动 → 063 移动后生态检测 → 064 HP/出生/死亡分流 → 065 Bud → 066 Flower → 067 阶段渲染。
+- **扫描结论**：养分字段**已存在**——`TileAttributeData`（struct）含 `Nutrient` / `Magic` + `Withdraw/Deposit`；`GridData` 用 `CellType[,]` + `TileAttributeData[,]` 并行数组；`GridManager` 已有 4 邻常量 `CardinalDirections`。→ 无需新增养分字段。
+- **新增（`GridData.cs`）**：`HasAbsorbableNutrient(x,y)` 派生只读（`IsSoil && Nutrient>0`，无额外 bool）。
+- **新增（`GridManager.cs`）**：
+  - `int GetNeighborCells4(x,y, Vector2Int[] buffer)` —— 非分配，填入 buffer 返回 count（传复用 `Vector2Int[4]` 可零 GC）。
+  - `bool TryGetNeighborCells4(x,y, List<Vector2Int> results)` —— 清空并填 List，返回是否有。
+  - `HasAbsorbableNutrient(x,y)` —— 委托 GridData。
+  - 加 `using System.Collections.Generic;`。
+  - 性能：每次最多访问 4 邻格；无每帧 / 全图扫描 / Chunk Dirty（v1 不提前复杂化）。
+- **验证（A 类，未进 Play Mode）**：refresh 0 Error；`execute_code`：
+  - `GridData`：空养分→false / Soil+养分3→true / 非Soil→false。
+  - `GridManager`（编辑模式 `InitializeGrid()` 重建内存网格后）：邻格 内部(5,5)=4、角(0,0)=2、List 版一致。
+- **边界**：未改场景（`InitializeGrid` 仅重建内存运行时网格，未序列化/未存盘）；未改 prefab；未进 Play Mode；未跑 git。
+- **下一步**：TASK-062 规则移动（沿向/遇阻转向/移动完成回调，无寻路）。
+
+### 2026-06-13 TASK-062 — Slime/Moss 规则移动（逻辑 + 改键 + 移动完成 hook）
+
+- **范围**：只做移动机制，不寻路、不每帧、不扣 HP（064）、不吸放（063）。
+- **新增 `Assets/Scripts/Monsters/MonsterMovementSystem.cs`**（static）：
+  - `ComputeNextStep(pos, dir, canEnter, out newPos, out newDir)` —— 纯决策，可单测：① 直行（前方 canEnter）；② 遇阻按固定顺序 `TurnOrder`（上/下/左/右，跳过原朝向）选第一个可进方向转向；③ 全堵则不动、保持朝向。
+  - `TryMoveStep(monsters, grid, pos)` —— 整合：canEnter = `IsInside && IsWalkable && !HasMonster`；更新朝向；成功则 `MoveMonster` 改键。
+- **`MonsterData`**：加 `MoveDirection`（默认 `Vector2Int.right`）+ `SetMoveDirection`。
+- **`MonsterManager`**：加 `MoveMonster(from,to)`（字典改键、目标被占则失败=不堆叠）+ `event MonsterMoved(from,to)`（移动完成 hook，TASK-063 订阅跑生态检测）。
+- **验证（A 类，未进 Play Mode）**：refresh 0 Error；execute_code：直行→(3,2)、遇阻转向→(2,3) dir 上、被困不动、MoveMonster 改键+事件触发、不堆叠拒绝、TryMoveStep 整合移动成功。
+- **踩坑**：execute_code(CodeDom C#6) 方法体内不能写 `using` 别名、不支持 `out var`；新脚本编译/域重载完成前 execute_code 找不到新类型（稍后重试即可）。
+- **边界**：未改场景；未改 prefab；未进 Play Mode；未跑 git。
+- **未做 / 下一步**：①TASK-063 把吸放挂到 `MonsterMoved`；②真正让史莱姆在游戏里走起来需要一个**生态 tick 驱动 MonoBehaviour 入场景**（场景改动，先汇报再做）。
+
+### 2026-06-13 TASK-063 — 移动完成后的生态检测（4 邻吸收/释放 + 回血）
+
+- **新增 `Assets/Scripts/Monsters/MonsterEcologySystem.cs`**（static）+ `EcologyAction` 枚举：
+  - `ResolveAfterMove(monster, pos, grid)`：核心；`ResolveAt(monsters, grid, pos)`：按格查怪后调用。
+  - 阶梯（全读 `MonsterArchetype`）：`n<=AbsorbWhenNutrientLessOrEqual` → 找 4 邻中 `HasAbsorbableNutrient` 的 Soil 吸 1 点 + `Heal(HpHealPerAbsorb)`；`n==BudRequiredNutrient(2)` → Stable；`n>=ReleaseWhenNutrientGreaterOrEqual(3)` → 向相邻 Soil 释放 `surplus=n-KeepNutrientOnRelease`，绝不低于 Keep。
+  - 边界：无可吸养分 → NoAbsorbTarget（不动作）；无 Soil 可释放 → NoReleaseTarget（养分保持）；Empty 不作资源容器。
+  - 每次最多访问 4 邻格；非每帧。
+- **`MonsterData`**：新增 `Heal(int)`（上限 MaxHP）。
+- **挂接点**：`MonsterManager.MonsterMoved`（移动完成 hook）——实际订阅在 tick 驱动入场景时接（TASK-064/驱动步骤）。
+- **验证（A 类，未进 Play Mode）**：refresh 0 Error；execute_code 5 用例：
+  - 吸收 n0→1 / HP11→13(+2) / 邻格5→4；稳定 n2 不变；释放 n3→2 / 邻格0→1（守住 Keep=2）；无可吸 NoAbsorbTarget；无释放目标 NoReleaseTarget n=3 保持。
+- **踩坑**：新脚本编译后需待域重载完成 execute_code 才识别新类型（`refresh all` + typeof 复核后通过）。
+- **边界**：未改场景；未改 prefab；未进 Play Mode；未跑 git。
+- **下一步**：TASK-064（HP 移动消耗 + InitialHP 出生值 + 自然死亡 `Nutrient>=2`→Bud / `<2`→StarvationFailed）。
+
+### 2026-06-13 TASK-064 — HP 移动消耗 + InitialHP 出生 + 自然死亡分流
+
+- **`MonsterData`**：
+  - 出生 HP 改为 `InitialHP`（>0 时取 `Clamp(InitialHP,1,MaxHP)`，否则 MaxHP）→ Slime 出生 16 / MaxHP 21。
+  - 新增 `TransformTo(stage, maxHp)`：切阶段 + 重置 HP 池（CurrentHP=MaxHP=新阶段上限），保留 Nutrient/Magic。
+- **新增 `Assets/Scripts/Monsters/MonsterLifecycleSystem.cs`** + `LifecycleOutcome` 枚举：
+  - `ApplyMoveHpCost(m)`：扣 `HpCostPerMove`；`UseRandomMoveHpCost` 为真时取 `[Min,Max]` 随机（v1 false=固定 1）。
+  - `ResolveNaturalDeath(m, pos, monsters)`：仅 Crawling 阶段；`HP<=0` 且 `Nutrient>=BudRequiredNutrient` → `TransformTo(Bud, BudMaxHP)`；否则 StarvationFailed → `FloatingResourcePool.Deposit` + `RemoveMonster`。**不调用 ScatterOrdinaryDeathResources**。Bud/Flower 死亡留待 065/066（非 Crawling 返回 Alive 占位）。
+- **验证（A 类，未进 Play Mode）**：refresh 0 Error；execute_code：出生 16/21；移动扣血 16→15；养分2 死亡→Bud(stage/HP/Max=Bud,养分保留)；养分1 死亡→StarvationFailed(FloatingPool +1、移除)；存活→Alive。
+- **注意**：史莱姆现在出生 HP=16（非满血），是有意的（出生逻辑接入）；属数据/行为，无场景改动。
+- **边界**：未改场景；未改 prefab；未进 Play Mode；未跑 git。
+- **下一步**：TASK-065（Bud：5×5 吸收 + 达 `BudToFlowerNutrient` 转 Flower；HP 归零未达阈值 → WitherFailed）。
+
+### 2026-06-13 TASK-065/066/067/068 — Bud/Flower 生命周期 + 渲染 + tick 驱动 + 场景接线
+
+- **TASK-065 Bud（`MonsterLifecycleSystem.BudTick`）**：5×5(`BudAbsorbRadius`)环形从近到远吸 1/tick 进 `CollectedNutrient`；达 `BudToFlowerNutrient(8)` → `TransformTo(Flower, FlowerMaxHP)`（保留 Collected）；否则扣 `BudHpDecayPerTick`，HP≤0 → WitherFailed（Collected+Current 进 FloatingPool、移除）。Crawling→Bud 时 `SeedCollected(CurrentNutrient)`。
+- **TASK-066 Flower（`FlowerTick`）**：7×7(`FlowerAbsorbRadius`)吸收进 Collected（上限 `FlowerMaxAbsorb=11`）；扣 `FlowerHpDecayPerTick`，HP≤0 → 繁殖：`spawnCount=min(FlowerMaxSpawn=5, ⌊Collected/NutrientPerSpawn=2⌋)`，先移除花再 `ReproduceSlimes`（origin+4 邻固定顺序，Empty 且无怪，不堆叠）。
+- **MonsterData**：新增 `CollectedNutrient`(+Seed/Add)；`TryMoveStep` 增 `out newPos`；`MonsterManager.CollectPositions` 快照。
+- **TASK-067 渲染**：建 `AC_Bud`(anim_plant_growth)/`AC_Flower`(anim_flower_bloom)；`MonsterRenderer` 重写——按 `Stage` 切 AnimatorController（`ApplyStageController`）、`SyncViews`（增/删/换阶段）、订阅 `MonsterManager.MonsterMoved` 平滑重定位（不重建）。
+- **TASK-068 驱动**：新增 `EcologyTickDriver`（每 1.0s：快照 → 每怪按 Stage 派发；Crawling=移动→`ApplyMoveHpCost`→`ResolveAfterMove`→`ResolveNaturalDeath`；Bud/Flower=各自 tick → `SyncViews`）。**已加到场景 `MonsterManager` 物体并保存 GameScene**（GridManager 在他物体上，驱动 FindObjectOfType 兜底）。
+- **验证（A 类，未进 Play Mode）**：refresh 0 Error/0 Warning；execute_code：
+  - Bud→Flower 6 tick（Collected 2→8、HP/Max 重置 21）；Bud 枯萎失败 10 tick（池 +2、移除）；Flower 繁殖 6 tick（生成 5 只、原格变 Crawling）。
+  - 驱动 `ProcessTick` 反射集成 6 tick：史莱姆沿走廊移动 + 吸养分到储备 2 + HP 随移动消耗，整链无异常。
+- **踩坑**：Unity `??` 不识别 GetComponent 伪 null（驱动改用显式 `==null`）；`UnloadPrefabContents` 后勿再访问其组件；新脚本编译需待域重载完成 execute_code 才识别。
+- **边界**：进 Play Mode 未做（交用户验收）；改了场景（加 EcologyTickDriver 并保存，用户已授权）；未跑 git。
+- **C 类（交用户验收测试）**：进 Play Mode → 挖掘生成史莱姆 → 观察 移动动画 / 直线撞墙转向 / 4 邻吸放（土块养分变化）/ HP 衰弱 → 转花苞(plant_growth)→ 开花(flower_bloom)→ 枯萎繁殖出新史莱姆。
+
+### 2026-06-13 试玩反馈修复 — 平滑移动 / 吸放动画反馈 / 限制地下
+
+用户试玩反馈 3 问题，逐一修复（逻辑均 execute_code 验证，渲染交用户 Play 复验）：
+
+- **问题1 逐格跳变 → 平滑移动**：新增 `MonsterViewMover`（按 `speed` cells/sec `Vector3.MoveTowards` 滑向目标）。`MonsterRenderer` 创建视图时挂载并 `SnapTo`，`OnMonsterMoved` 改为 `MoveTo`（不再瞬移）。速度 `MonsterRenderer.viewMoveSpeed`（默认 1.0=每 tick 1 格连续滑动，可调）。数据层仍逐格/tick，仅视图插值。
+
+- **问题2 看不到吸放/土块无变化 → 动画反馈**：
+  - `AC_Slime` 原地改造为状态机：默认 `anim_slime_move`(循环) + `Absorb`(anim_slime_absorb) + `Emit`(anim_slime_emit)，触发器 `Absorb`/`Emit`，一次性播放后按 exitTime 回 Move。GUID 不变（prefab 引用不破）。
+  - `MonsterRenderer.PlayCrawlingAction(pos, absorb)` 对 Crawling 视图 `SetTrigger`；`EcologyTickDriver` 捕获 `ResolveAfterMove` 的 `EcologyAction`，Absorbed→播 Absorb、Released→播 Emit。
+  - 说明：土块 sprite 本就监听 `TileAttributeChanged` 刷新；养分可视索引粒度粗（1-10 共 5 档），吸 1 点常跨不过档位故"看着没变"，但释放进 0 养分土（0→1）会变；动画现在是每次吸放的明确信号。
+
+- **问题3 史莱姆爬出地道 → 限制地下**：`GridManager.IsMonsterTraversable(x,y)` = `Empty && !IsSurfaceBackgroundRow(y)`（排除地表/天空与入口）。移动 `canEnter` 与 `ReproduceSlimes` 落位都改用它。验证：竖井顶(35,39)朝上不会进 y=40 入口/地表，转向下到(35,38)，留在地下。
+
+- **验证（A 类，未进 Play）**：refresh 0 Error；IsMonsterTraversable 四例正确；ComputeNextStep 顶部朝上转向下；AC_Slime states=[move,Absorb,Emit] params=[Absorb,Emit]。
+- **边界**：未改场景结构（驱动已在场景；新串行字段取默认；AC_Slime 原地改）；未进 Play Mode；未跑 git。
+- **C 类（交用户复验）**：Play → 史莱姆连续滑动移动 / 吸放时播 absorb·emit 动画 / 释放处土块变色 / 不再爬出地道。
+
+### 2026-06-13 试玩反馈修复 2 — 魔物子系统重构（无碰撞/同格/平滑/死亡/转向）
+
+用户 5 点反馈，根因是魔物按"格子→单个"存储放不下多个，故重构为"**按个体存储，各自带 Position，同格可多个**"：
+
+- **#1 无碰撞穿插**：`MonsterManager` 改 `List<MonsterData>`（`MonsterData.Position`）；移动 `canEnter` 只看地形（`IsMonsterTraversable`），不再把其他魔物当障碍。
+- **#4 同格出生**：花繁殖 N 只全部 `Spawn` 在花自身格（删除 origin+邻格扩散）。
+- **#5 移动规则**：`ComputeNextStep` 改为 直行→受阻则向开放的垂直方向（左右都通则随机）→ 死路回头 → 全堵不动；`Spawn` 时随机初始朝向。
+- **#1 平滑移动**：`MonsterViewMover`（`MoveTowards` 按 `viewMoveSpeed` 滑动）；视图层每 tick `SyncViews` 把每个魔物的视图 `MoveTo` 其格中心，连续滑动而非瞬移。
+- **#2 转化吸附**：阶段变 Bud/Flower 时 `SnapTo` 到该格（移动到下一格后停住再转化）。
+- **#3 死亡动画**：`AC_Slime`/`AC_Bud`/`AC_Flower` 各加 `Death` 状态（AnyState→Death，触发器 `Death`，剪辑 slime/plant/flower_death）；`MonsterRenderer.NotifyMonsterDied` 播死亡动画后延时销毁；`EcologyTickDriver`（StarvationFailed/WitherFailed/Reproduced）与 `CombatSystem`（HeroKill）都改为调用它。
+- **吸放反馈**：`AC_Slime` 的 Absorb/Emit 触发保留；驱动按 `EcologyAction` 触发。
+
+- **架构连带改动**：`MonsterManager`（Spawn/Remove(by ref)/CollectAll/Count，去掉 MoveMonster/MonsterMoved/CollectPositions/CanPlaceMonster）；`MonsterMovementSystem.TryMoveStep(m,grid,out)`；`MonsterEcologySystem.ResolveAfterMove(m,grid)`；`MonsterLifecycleSystem`(各方法去 pos 参数，用 m.Position)；`MonsterRenderer` 视图按 `MonsterData` 引用键、`CreateMonsterView(data)`、`SyncViews`、去掉旧 RemoveMonsterView/GetMonsterView/MonsterMoved 订阅；`DigActionHandler` 用 `Spawn`；`CombatSystem` 用 `Remove(monster)`+`NotifyMonsterDied`。
+- **验证（A 类，未进 Play）**：refresh 0 Error；execute_code：同格 2 只、穿插移入、两侧随机拐弯、死路回头、随机出生朝向、花同格繁殖 5 只；三控制器均含 Death 状态。
+- **边界**：未改场景结构（已有组件，新串行字段取默认）；未进 Play Mode；未跑 git。
+- **C 类（交用户复验）**：连续滑动移动 / 互相穿插 / 撞墙随机拐弯·死路回头 / 吸放·死亡动画 / 转化落格 / 花后代同格出生。

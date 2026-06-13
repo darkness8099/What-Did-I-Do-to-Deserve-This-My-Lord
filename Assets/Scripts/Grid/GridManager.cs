@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class GridManager : MonoBehaviour
@@ -70,6 +71,15 @@ public class GridManager : MonoBehaviour
         return type == CellType.Empty || type == CellType.Entrance;
     }
 
+    // Where monsters may move into / spawn on: an Empty cell inside the underground area only.
+    // Excludes the surface/sky rows and the Entrance, so monsters can't climb out of the dungeon.
+    public bool IsMonsterTraversable(int x, int y)
+    {
+        return IsInside(x, y)
+            && gridData.GetCell(x, y) == CellType.Empty
+            && !IsSurfaceBackgroundRow(y);
+    }
+
     public bool IsDiggable(int x, int y)
     {
         if (!gridData.IsInside(x, y)) return false;
@@ -123,5 +133,48 @@ public class GridManager : MonoBehaviour
         }
         gridData.SetTileAttribute(x, y, attribute);
         TileAttributeChanged?.Invoke(x, y);
+    }
+
+    // ===== 4-cardinal neighbor queries (TASK-061) =====
+    // v1 ecology budget: each ecology check visits at most these 4 cells; no per-frame / whole-grid scan.
+
+    // Non-allocating: fills `buffer` (length >= 4) with in-bounds up/down/left/right neighbor coords; returns count.
+    // Pass a reusable Vector2Int[4] to avoid GC when called per move / per ecology tick.
+    public int GetNeighborCells4(int x, int y, Vector2Int[] buffer)
+    {
+        if (buffer == null || buffer.Length < 4)
+        {
+            Debug.LogWarning("[GridManager] GetNeighborCells4 requires a buffer of length >= 4.");
+            return 0;
+        }
+
+        int count = 0;
+        foreach (Vector2Int dir in CardinalDirections)
+        {
+            int nx = x + dir.x;
+            int ny = y + dir.y;
+            if (IsInside(nx, ny)) buffer[count++] = new Vector2Int(nx, ny);
+        }
+        return count;
+    }
+
+    // Convenience: clears and fills `results` with in-bounds 4-neighbors; returns true if any.
+    public bool TryGetNeighborCells4(int x, int y, List<Vector2Int> results)
+    {
+        if (results == null) return false;
+        results.Clear();
+        foreach (Vector2Int dir in CardinalDirections)
+        {
+            int nx = x + dir.x;
+            int ny = y + dir.y;
+            if (IsInside(nx, ny)) results.Add(new Vector2Int(nx, ny));
+        }
+        return results.Count > 0;
+    }
+
+    // Derived helper (no stored bool): true only if (x,y) is Soil and holds Nutrient.
+    public bool HasAbsorbableNutrient(int x, int y)
+    {
+        return gridData != null && gridData.HasAbsorbableNutrient(x, y);
     }
 }

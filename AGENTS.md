@@ -6,6 +6,7 @@ This Unity project uses `Assets/AI_DOCS` as the source of truth. Read these file
 2. `Assets/AI_DOCS/UNITY_MCP_RULES.md`
 3. `Assets/AI_DOCS/GAME_DESIGN_BASE.md`
 4. `Assets/AI_DOCS/AI_UNITY_WORKFLOW_TEMPLATE.md`
+5. `Assets/AI_DOCS/GAME_DESIGN_SLIME.md`（匍匐苔藓 / 史莱姆生态设计）
 
 For art or sprite work, also read:
 

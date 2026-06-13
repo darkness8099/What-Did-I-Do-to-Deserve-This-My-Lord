@@ -65,4 +65,12 @@ public class GridData
         if (!IsInside(x, y)) return;
         attributes[x, y] = attribute;
     }
+
+    // Derived (no stored bool): a cell is absorbable only if it is Soil and holds Nutrient.
+    // Equivalent to the design's `IsSoil && Nutrient > 0`.
+    public bool HasAbsorbableNutrient(int x, int y)
+    {
+        if (!IsInside(x, y)) return false;
+        return cells[x, y] == CellType.Soil && attributes[x, y].Nutrient > 0;
+    }
 }

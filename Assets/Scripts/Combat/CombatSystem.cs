@@ -60,8 +60,8 @@ public class CombatSystem : MonoBehaviour
                     gridManager,
                     DeathCause.HeroKill,
                     monster.DisplayName);
-                monsterManager.RemoveMonster(gridPos.x, gridPos.y);
-                monsterRenderer.RemoveMonsterView(gridPos.x, gridPos.y);
+                if (monsterRenderer != null) monsterRenderer.NotifyMonsterDied(monster); // play death anim then destroy view
+                monsterManager.Remove(monster);
                 Debug.Log($"[CombatSystem] {monster.DisplayName} defeated at {gridPos}. Hero HP: {hero.CurrentHP}");
                 yield break;
             }

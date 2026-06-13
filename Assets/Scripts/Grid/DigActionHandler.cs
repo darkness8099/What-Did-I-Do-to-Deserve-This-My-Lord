@@ -54,11 +54,11 @@ public class DigActionHandler : MonoBehaviour
         if (attr.CanSpawnMonster())
         {
             MonsterArchetype archetype = ResolveArchetypeForElement(attr.ElementType);
-            if (archetype != null && monsterManager.PlaceMonster(x, y, archetype))
+            MonsterData data = archetype != null ? monsterManager.Spawn(x, y, archetype) : null;
+            if (data != null)
             {
-                MonsterData data = monsterManager.GetMonster(x, y);
                 data.AbsorbFromTile(ref attr);
-                monsterRenderer.CreateMonsterView(x, y, data);
+                monsterRenderer.CreateMonsterView(data);
                 Debug.Log($"[Resource] Dig({x},{y}): tile→{data.DisplayName} N={data.CurrentNutrient} M={data.CurrentMagic}; tile remaining N={attr.Nutrient} M={attr.Magic}");
             }
             attr.ElementType = TileElementType.None;
