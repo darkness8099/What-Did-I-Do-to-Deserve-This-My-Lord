@@ -152,11 +152,66 @@
 
 ---
 
+## 阶段 11：项目收尾（Closeout）——冻结范围，目标＝可打包 + 可录像
+
+> **本阶段目标**：不再增加玩法内容。把"纯 AI 工作流能否产出完整可玩游戏"这个立项目标的最后一环——**打包产物**——补上，并保证录像时画面构图符合设计。
+> **验收标准**：双击 exe 能进 GameScene、能挖、能跑完一局出现胜负 UI、画面比例正确、无 Console Error。
+> **范围冻结**：本节 TASK-070 ~ TASK-076 完成即收尾。不新增编号。
+
+### 执行顺序（重要）
+
+先打一个**废包**拿真实报错清单，再修。构建失败是静默的（见 TASK-071），不实际打一次无法知道还有多少隐藏失效点。
+
+- [x] **TASK-070** — 基线废包诊断完成。`Builds/Baseline/` Windows64 development build：**succeeded / 0 Error / 3 Warning / 72.9s / 105.37 MB**。构建管线本身健康。3 条警告全部是 `BackgroundLayerRenderer` 的 `savedPrefabFolder`(14) / `savedPrefabNamePrefix`(15) / `savedPrefabMaxCount`(16) — CS0414「赋值但从未使用」。**这直接证实了 TASK-071 的诊断**：Player 构建剥离 `#if UNITY_EDITOR` 后，这三个字段唯一的消费者 `PickRandomSavedBackgroundPrefab()` 一并消失，即背景加载路径在产物中不存在。`MonsterRenderer` 因字段带 `[SerializeField]`（序列化算使用）未报同类警告，但其加载代码同样被剥离，运行时为 null。**结论：构建 0 Error 但功能静默失效，与预期一致。** 未运行该废包（仅含空 SampleScene，运行无信息量），真实烟测归于 TASK-076。
+- [x] **TASK-071** — 已修复。诊断结论：场景实例上 `MonsterRenderer.slimePrefab / acCrawling / acBud / acFlower` **全部为 null**（此前完全依赖 `#if UNITY_EDITOR` 的 AssetDatabase 兜底），构建后史莱姆靠 `spriteSlime` 回退仍可见但**无 Animator、完全不动**。处理：① 场景接线 4 个引用（Slime.prefab + AC_Slime/AC_Bud/AC_Flower）；② `BackgroundLayerRenderer` 新增 `[SerializeField] GameObject[] savedBackgroundPrefabs` + `PickRandomBackgroundPrefab()`——序列化列表为构建期唯一有效来源，编辑器文件夹扫描降级为回退，`LoadRandomSavedBackgroundForGameplay` 不再整体包在 `#if UNITY_EDITOR` 里；③ 3 个纯编辑器字段移入 `#if UNITY_EDITOR`，消除 TASK-070 的 3 条 CS0414。已接入 4 个 `PF_Background_Surface_01~04`。GameScene 已保存。**编译 0 Error / 0 Warning。** 另记：`LoadSprite`(348) 同为 AssetDatabase，但仅服务编辑器草稿流程 `RebuildLayers()`，运行时不走，非构建阻塞项，保持原样。
+  > 方案变更记录：原计划改用 `Resources.Load` + 移动资产到 `Assets/Resources/`。实际因 MCP 恢复后可直接操作场景，改用**序列化引用**——更符合 Unity 惯例、不产生 Resources 目录、无需移动任何资产文件。结果等价且风险更低。
+- [x] **TASK-072** — GameScene 入 Build Settings 并设为 index 0，移除 SampleScene。**需要 Editor（ProjectSettings 由运行中的 Editor 持有，外部改会被覆盖）。**
+- [x] **TASK-073** — 锁定分辨率与画面比例。TASK-041 的「16:9 / 约 28×16 格」是靠人工在 Editor Game View 顶部选 Aspect 保证的，**打包后无任何机制保证**：`InputHandler.ApplyInitialCameraView` 只按 `CameraViewRows` 推纵向 `orthographicSize`，横向可见列数完全随窗口宽高比漂移（21:9 全屏会看到 40+ 列，构图与设计不符）。方案：Player Settings 固定 1920×1080、窗口模式、禁用 resizable。**需要 Editor（ProjectSettings）。**
+- [x] **TASK-074** — 关闭构建产物中的诊断开销。`EcologyTickDriver.enableSlimeEcologyDiagnostics` 默认 `true`：每 tick 写文件 + 每 5 秒全图扫描 3500 格。⚠️ **注意：该字段是 `[SerializeField]`，场景实例上已序列化为 `true`，仅改代码默认值无效**，必须改场景实例值（或改为 `#if !UNITY_EDITOR` 强制关闭）。**需要 Editor（场景）或代码侧强制。**
+- [x] **TASK-075** — 完成 TASK-029F（全清单唯一遗留项）+ 补重开键。`MVPResultUI` 目前是代码生成 Legacy Text 打 "VICTORY"/"DEFEAT" 字符串，而这是录像结尾唯一露脸的 UI。用现有 147 张素材里的 victory panel 替换；同时补 R 键重开，便于多镜头重录。**美术资源若缺失，先用 Unity 内置组件平替并向用户确认。**
+- [x] **TASK-076** — 正式打包 + 启动烟测完成（录制彩排待人工）。彩排目的：确认镜头前节奏可用（tick=1.0s、Bud 需攒 8 养分、Flower 要 HP 衰减到 0 才繁殖，生态演化在镜头前可能过慢）。若节奏不适合录像，**在此处一次性调完 tick 参数，不回头再开新任务**。
+
+### 收尾执行结果（2026-08-03）
+
+**产物**：`Builds/Closeout/WhatDidIDo.exe` — Windows64 release，**0 Error / 0 Warning / 38.4s / 99.67 MB**。
+
+**逐项落地**：
+
+| Task | 结果 |
+|---|---|
+| 072 | Build Settings 现为 `GameScene`(index 0)，SampleScene 已移除 |
+| 073 | PlayerSettings 固定 `1920x1080` / Windowed / `resizable=false` / `nativeRes=false`。实测 aspect=1.778 → 横向可见 **≈28.4 格**，命中 TASK-041 设计目标 28（可接受 27–30） |
+| 074 | 场景实例 `EcologyTickDriver.enableSlimeEcologyDiagnostics` 由 `true` 改为 `false`（代码默认值无效，必须改实例，已验证） |
+| 075 | `MVPResultUI` 重写为内置组件面板：全屏压暗 + 900×420 卡片 + 强调条 + 118px 标题 + `Press R to Restart`；仅在状态变化时重绘（旧版每帧改写文本）。`MVPGameManager` 加 R 键重开（仅在非 Playing 时响应）。**连带修复**：`FloatingResourcePool` 是静态累加器，场景重载不清零，重开会继承上一局游离资源 → 新增 `Reset()` 并在 `Restart()` 中调用。UI 文案全英文（内置 LegacyRuntime 字体无中日韩字形）|
+| 076 | 启动烟测通过。Player.log 全程 0 异常，各 Manager 正常初始化，`[BackgroundLayerRenderer] Loaded gameplay background prefab: PF_Background_Surface_04` —— **构建产物中背景加载成功，TASK-071 得到真实验证** |
+
+**烟测未覆盖（属 C 类，需人工 Play）**：挖掘、魔物生成、生态生命周期（Crawling→Bud→Flower→繁殖）、战斗、胜负判定与结算面板实际显示。启动烟测只证明「能起、能加载、无异常」。
+
+**遗留待人工决策**：场景中 `LevelConfig.heroSpawnDelaySeconds = 100`（代码默认 10）。开发期为留足挖掘测试时间而设，但录像开场会有 100 秒无事发生。是否下调由录制者决定。
+
+**待清理**：`Assets/Editor/Closeout/CloseoutPlayerSettings.cs` 为临时菜单项（因 MCP `execute_code` 存在 BOM 编译 bug 而建），PlayerSettings 已持久化，可随时删除。
+
+---
+
+### 本阶段明确不做（防止范围再次膨胀）
+
+| 不做项 | 原因 |
+|---|---|
+| asmdef / namespace 整理 | 纯工程洁癖，录像不可见，却要动全部 36 个文件 |
+| `GridRenderer` 改 Tilemap | 3500 个 GameObject 当前跑得动；收尾期风险最高、收益最不确定。除非 TASK-070 废包实测掉帧，否则不碰 |
+| 补自动化测试 / asmdef 测试程序集 | 其价值是迭代期的回归保护网。项目停止迭代后 ROI 归零 |
+| 死代码清理（`MonsterType` / `Hunger` / `TransferResourcesToPredator` 零调用方 / `MonsterData.Tick()` 空方法） | 不可见。全部完成后有余力再说 |
+| 第二种魔物 / 波次 / 音效 / 存档 / 多关卡 | 与"验证 AI 工作流"目标的边际贡献为零 |
+| 文档漂移修复（TASK-062/063/067 描述的 `MonsterManager.MonsterMoved` / `MoveMonster` 已随 List 重构消失） | 记录在此备查；收尾完成后统一订正，不占用构建路径 |
+
+---
+
 ## 编号维护说明
 
 - `TASKS.md` 以“当前真实任务状态”为准。
 - `AI_WORKFLOW_LOG.md` 中旧的“后续建议任务”如果与后续正式编号冲突，应视为历史建议，不再作为编号依据。
-- 当前最新已落档任务为 `TASK-069`，后续新任务从 `TASK-070` 起顺延。（阶段 10 已完成 061→068：Grid 数据/邻格 → 规则移动 → 移动后生态检测 → HP/出生/死亡分流 → Bud → Flower → 阶段渲染 → tick 驱动+场景接线；TASK-069 移动动画为视觉层先行。整条匍匐苔藓生命周期已可进 Play Mode 试玩）
+- 当前最新已落档任务为 `TASK-076`。**阶段 11 为收尾阶段，范围已冻结，不再新增编号。**
+- 阶段 10 完成情况：061→068（Grid 数据/邻格 → 规则移动 → 移动后生态检测 → HP/出生/死亡分流 → Bud → Flower → 阶段渲染 → tick 驱动+场景接线）；TASK-069 移动动画为视觉层先行。（阶段 10 已完成 061→068：Grid 数据/邻格 → 规则移动 → 移动后生态检测 → HP/出生/死亡分流 → Bud → Flower → 阶段渲染 → tick 驱动+场景接线；TASK-069 移动动画为视觉层先行。整条匍匐苔藓生命周期已可进 Play Mode 试玩）
 
 ---
 

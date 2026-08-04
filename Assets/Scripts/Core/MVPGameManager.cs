@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public enum GameState { Playing, Victory, Defeat }
 
@@ -43,4 +44,19 @@ public class MVPGameManager : MonoBehaviour
         Debug.Log($"[MVPGameManager] Game Over - Hero {heroId} escaped with DemonLord through Entrance.");
     }
 
+    // Restart is only offered once the round has resolved, so a stray R mid-run can't wipe progress.
+    private void Update()
+    {
+        if (IsPlaying()) return;
+        if (Input.GetKeyDown(KeyCode.R)) Restart();
+    }
+
+    // Reloads the active scene. Static ecology state does NOT reset on scene load, so it is
+    // cleared explicitly — otherwise the next run inherits the previous run's floating resources.
+    public void Restart()
+    {
+        Debug.Log("[MVPGameManager] Restarting level.");
+        FloatingResourcePool.Reset();
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
 }

@@ -17,4 +17,12 @@ public static class FloatingResourcePool
         TotalMagic    += m;
         // (Console log removed to avoid spam; slime ecology events are captured by SlimeEcologyDiagnostics file.)
     }
+
+    // Static state survives scene reloads, so a restart would otherwise inherit the previous
+    // run's floating resources. Called by MVPGameManager.Restart (TASK-075).
+    public static void Reset()
+    {
+        TotalNutrient = 0;
+        TotalMagic    = 0;
+    }
 }

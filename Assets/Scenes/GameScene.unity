@@ -285,11 +285,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 842122851f4586d46b095645aa29c6b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  slimePrefab: {fileID: 0}
+  slimePrefab: {fileID: 6934066389451850446, guid: 41146dceee8a3c243a96c1e97288f31a, type: 3}
   spriteSlime: {fileID: 21300000, guid: 62e9e6792a72d6342a217ebdb7a858f7, type: 3}
-  acCrawling: {fileID: 0}
-  acBud: {fileID: 0}
-  acFlower: {fileID: 0}
+  acCrawling: {fileID: 9100000, guid: 55294e5ee1c08d24e8f7ae3979ce281c, type: 2}
+  acBud: {fileID: 9100000, guid: 5f4da0dcc38105f44965bee88665807e, type: 2}
+  acFlower: {fileID: 9100000, guid: bc5a39faaa2b21b48806979b59619749, type: 2}
+  viewMoveSpeed: 1
+  deathClipSeconds: 0.75
 --- !u!114 &1519096725
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -608,6 +610,11 @@ MonoBehaviour:
   surfaceDecorationSpawner: {fileID: 1971804141}
   levelConfig: {fileID: 1519096734}
   baseBackgroundPath: Assets/Art/Backgrounds/bg_overworld_00.png
+  savedBackgroundPrefabs:
+  - {fileID: 6839749185476361132, guid: 7db67a582483b5d46b7a7541f88d0b94, type: 3}
+  - {fileID: 9050079479565147710, guid: d598d841e4ceef9488c88e77742781f2, type: 3}
+  - {fileID: 3064987259303571308, guid: ef96cc393b2b8db44a2615b6874fe106, type: 3}
+  - {fileID: 2078069376889241780, guid: 2d3d5f95345d09845ad9ad263aef9912, type: 3}
   savedPrefabFolder: Assets/Prefabs/Backgrounds
   savedPrefabNamePrefix: PF_Background_Surface
   savedPrefabMaxCount: 10
@@ -804,6 +811,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   tickSeconds: 1
+  enableSlimeEcologyDiagnostics: 0
+  maxDiagnosticLines: 300
 --- !u!1 &2000000040
 GameObject:
   m_ObjectHideFlags: 0

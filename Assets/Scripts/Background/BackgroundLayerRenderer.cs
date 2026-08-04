@@ -11,9 +11,17 @@ public class BackgroundLayerRenderer : MonoBehaviour
     [SerializeField] private SurfaceDecorationSpawner surfaceDecorationSpawner;
     [SerializeField] private LevelConfig levelConfig;
     [SerializeField] private string baseBackgroundPath = "Assets/Art/Backgrounds/bg_overworld_00.png";
+
+    // Build-safe background source. Assigned in the Inspector; this is the ONLY path that survives
+    // into a player build — the AssetDatabase folder scan below is stripped outside the Editor.
+    [SerializeField] private GameObject[] savedBackgroundPrefabs;
+
+#if UNITY_EDITOR
+    // Editor-only authoring config: drives the save-as-prefab button and the folder-scan fallback.
     [SerializeField] private string savedPrefabFolder = "Assets/Prefabs/Backgrounds";
     [SerializeField] private string savedPrefabNamePrefix = "PF_Background_Surface";
     [SerializeField] private int savedPrefabMaxCount = 10;
+#endif
     [SerializeField] private bool loadRandomSavedPrefabOnStart = true;
     [SerializeField] private float decorationBaselineOffsetCells = 1f;
 
@@ -143,11 +151,10 @@ public class BackgroundLayerRenderer : MonoBehaviour
 
     public bool LoadRandomSavedBackgroundForGameplay()
     {
-#if UNITY_EDITOR
-        GameObject prefab = PickRandomSavedBackgroundPrefab();
+        GameObject prefab = PickRandomBackgroundPrefab();
         if (prefab == null)
         {
-            Debug.LogError($"[BackgroundLayerRenderer] No saved background prefab found in {savedPrefabFolder} with prefix {savedPrefabNamePrefix}.");
+            Debug.LogError("[BackgroundLayerRenderer] No background prefab available. Assign 'savedBackgroundPrefabs' in the Inspector — it is the only source that works in a player build.");
             return false;
         }
 
@@ -163,9 +170,29 @@ public class BackgroundLayerRenderer : MonoBehaviour
 
         Debug.Log($"[BackgroundLayerRenderer] Loaded gameplay background prefab: {prefab.name}");
         return true;
+    }
+
+    // Prefers the serialized list so builds work; falls back to the Editor-only folder scan
+    // so the existing "save background as prefab" authoring workflow keeps functioning.
+    private GameObject PickRandomBackgroundPrefab()
+    {
+        if (savedBackgroundPrefabs != null && savedBackgroundPrefabs.Length > 0)
+        {
+            List<GameObject> valid = new List<GameObject>();
+            for (int i = 0; i < savedBackgroundPrefabs.Length; i++)
+            {
+                if (savedBackgroundPrefabs[i] != null)
+                    valid.Add(savedBackgroundPrefabs[i]);
+            }
+
+            if (valid.Count > 0)
+                return valid[UnityEngine.Random.Range(0, valid.Count)];
+        }
+
+#if UNITY_EDITOR
+        return PickRandomSavedBackgroundPrefab();
 #else
-        Debug.LogError("[BackgroundLayerRenderer] Saved background prefab folder loading currently requires the Unity Editor.");
-        return false;
+        return null;
 #endif
     }
 
