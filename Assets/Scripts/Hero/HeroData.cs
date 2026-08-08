@@ -4,6 +4,8 @@ public enum HeroAttackType { Normal, AoE, Magic, Ranged }
 
 public class HeroData
 {
+    public HeroArchetypeConfig Archetype { get; private set; }
+    public string ArchetypeId => Archetype != null ? Archetype.HeroId : "hero";
     public string DisplayName { get; private set; }
     public int    MaxHP       { get; private set; }
     public int    CurrentHP   { get; private set; }
@@ -15,16 +17,22 @@ public class HeroData
     public Vector2Int     FacingDirection { get; private set; }
 
     public HeroData()
+        : this(HeroArchetypeConfig.RuntimeDefault)
     {
-        DisplayName = "Hero";
-        MaxHP       = 30;
-        CurrentHP   = 30;
-        Attack      = 3;
-        MoveSpeed   = 2.0f;
-        AttackRange = 1.0f;
-        AttackSpeed = 2.0f;
-        AttackType      = HeroAttackType.Normal;
-        FacingDirection = Vector2Int.right;
+    }
+
+    public HeroData(HeroArchetypeConfig archetype)
+    {
+        Archetype = archetype != null ? archetype : HeroArchetypeConfig.RuntimeDefault;
+        DisplayName = Archetype.DisplayName;
+        MaxHP       = Archetype.MaxHP;
+        CurrentHP   = MaxHP;
+        Attack      = Archetype.Attack;
+        MoveSpeed   = Archetype.MoveSpeed;
+        AttackRange = Archetype.AttackRange;
+        AttackSpeed = Archetype.AttackSpeed;
+        AttackType      = Archetype.AttackType;
+        FacingDirection = Vector2Int.down;
     }
 
     public bool IsAlive()

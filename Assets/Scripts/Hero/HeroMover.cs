@@ -15,6 +15,7 @@ public class HeroMover : MonoBehaviour
     private CombatSystem   combatSystem;
     private MVPGameManager mvpGameManager;
     private MonsterManager  monsterManager;
+    private EcologyTickDriver ecologyTickDriver;
 
     private static readonly Vector2Int[] CaptureOffsets =
     {
@@ -48,29 +49,29 @@ public class HeroMover : MonoBehaviour
         if (mvpGameManager == null) { Debug.LogError("[HeroMover] MVPGameManager not found."); yield break; }
 
         monsterManager = GetComponent<MonsterManager>() ?? FindObjectOfType<MonsterManager>();
+        ecologyTickDriver = GetComponent<EcologyTickDriver>() ?? FindObjectOfType<EcologyTickDriver>();
         if (monsterManager  == null) { Debug.LogError("[HeroMover] MonsterManager not found.");  yield break; }
 
-        float spawnDelay = levelConfig.HeroSpawnDelaySeconds;
-        if (spawnDelay > 0f)
-        {
-            Debug.Log($"[HeroMover] Waiting {spawnDelay:0.##} seconds before spawning hero.");
-            yield return new WaitForSeconds(spawnDelay);
-        }
-
-        demonLordManager.RequestReposition();
-        Debug.Log("[HeroMover] Hero spawn gated until DemonLord is repositioned.");
-        while (!demonLordManager.IsPlaced)
-            yield return null;
-
-        int heroId = heroManager.SpawnHeroAtEntrance();
-        if (heroId < 0) { Debug.LogError("[HeroMover] Failed to spawn hero."); yield break; }
-
-        heroRenderer.CreateHeroView(heroId);
-        Debug.Log($"[HeroMover] Hero {heroId} spawned and view created. Starting movement coroutine.");
-        StartCoroutine(MoveHero(heroId));
+        HeroWaveDirector waveDirector = GetComponent<HeroWaveDirector>();
+        if (waveDirector == null)
+            waveDirector = gameObject.AddComponent<HeroWaveDirector>();
+        waveDirector.Initialize(
+            levelConfig,
+            demonLordManager,
+            heroManager,
+            heroRenderer,
+            this,
+            mvpGameManager);
     }
 
-private IEnumerator MoveHero(int heroId)
+    public bool StartHero(int heroId)
+    {
+        if (heroManager == null || !heroManager.HasHero(heroId)) return false;
+        StartCoroutine(MoveHero(heroId));
+        return true;
+    }
+
+    private IEnumerator MoveHero(int heroId)
     {
         var pathfinder = new HeroPathfinder(gridManager.GetGridData());
         HeroRouteState routeState = HeroRouteState.GoingToDemonLord;
@@ -92,13 +93,21 @@ private IEnumerator MoveHero(int heroId)
 
             if (atGoal)
             {
+                heroRenderer.SetHeroMotion(heroId, heroData.FacingDirection, false);
                 if (routeState == HeroRouteState.GoingToDemonLord)
                 {
-                    Debug.Log($"[HeroMover] Hero {heroId} captured DemonLord. Returning to entrance.");
-                    mvpGameManager.NotifyHeroReachedDemonLord(heroId);
                     if (demonLordManager.Capture(heroId))
+                    {
+                        Debug.Log($"[HeroMover] Hero {heroId} captured DemonLord. Returning to entrance.");
+                        mvpGameManager.NotifyHeroReachedDemonLord(heroId);
                         demonLordRenderer.AttachCaptiveDemonLord(heroId, demonLordPos);
-                    routeState = HeroRouteState.ReturningToEntrance;
+                        routeState = HeroRouteState.ReturningToEntrance;
+                    }
+                    else
+                    {
+                        // Another hero is already carrying the DemonLord. Keep pursuing its live position.
+                        yield return null;
+                    }
                 }
                 else
                 {
@@ -109,13 +118,18 @@ private IEnumerator MoveHero(int heroId)
             }
 
             // 索敌：攻击范围内有怪物则停下战斗
-            Vector2Int? target = monsterManager.FindNearestMonsterInRange(currentPos, heroData.AttackRange);
-            if (target.HasValue)
+            if (ecologyTickDriver != null)
+                ecologyTickDriver.EnsureExactAround(currentPos, Mathf.CeilToInt(heroData.AttackRange));
+
+            MonsterData target = monsterManager.FindNearestMonsterTargetInRange(currentPos, heroData.AttackRange);
+            if (target != null)
             {
+                heroRenderer.SetHeroMotion(heroId, heroData.FacingDirection, false);
                 var combatResult = new CombatResult();
-                yield return StartCoroutine(combatSystem.ResolveCombatAt(heroId, target.Value, combatResult));
+                yield return StartCoroutine(combatSystem.ResolveCombat(heroId, target, combatResult));
                 if (!combatResult.HeroSurvived)
                 {
+                    DropDemonLordIfCaptor(heroId);
                     mvpGameManager.NotifyHeroDefeated(heroId);
                     yield break;
                 }
@@ -128,6 +142,7 @@ private IEnumerator MoveHero(int heroId)
                 : pathfinder.FindPath(currentPos, entrancePos);
             if (path == null || path.Count < 2)
             {
+                heroRenderer.SetHeroMotion(heroId, heroData.FacingDirection, false);
                 yield return new WaitForSeconds(1f);
                 continue;
             }
@@ -140,6 +155,7 @@ private IEnumerator MoveHero(int heroId)
             heroData.SetFacingDirection(new Vector2Int(
                 System.Math.Sign(nextPos.x - prevPos.x),
                 System.Math.Sign(nextPos.y - prevPos.y)));
+            heroRenderer.SetHeroMotion(heroId, heroData.FacingDirection, true);
 
             // 返程：魔王同步平移至勇者前一格
             if (routeState == HeroRouteState.ReturningToEntrance)
@@ -147,7 +163,18 @@ private IEnumerator MoveHero(int heroId)
 
             yield return StartCoroutine(SmoothMove(heroId, currentPos, nextPos));
             heroManager.SetHeroPosition(heroId, nextPos);
+            if (routeState == HeroRouteState.ReturningToEntrance)
+                demonLordManager.UpdateCapturedPosition(heroId, prevPos);
         }
+    }
+
+    private void DropDemonLordIfCaptor(int heroId)
+    {
+        if (!demonLordManager.IsCaptured || demonLordManager.CaptorHeroId != heroId) return;
+
+        Vector2Int dropPosition = demonLordManager.GetPosition();
+        if (demonLordManager.ReleaseCaptureAt(heroId, dropPosition))
+            demonLordRenderer.DropCaptiveDemonLord(heroId, dropPosition);
     }
 
     private IEnumerator SmoothMove(int heroId, Vector2Int from, Vector2Int to)

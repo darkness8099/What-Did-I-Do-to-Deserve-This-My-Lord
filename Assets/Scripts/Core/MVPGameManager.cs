@@ -30,11 +30,16 @@ public class MVPGameManager : MonoBehaviour
     public void NotifyHeroDefeated(int heroId)
     {
         if (!IsPlaying()) return;
-        if (!heroManager.HasAnyHero())
-        {
-            CurrentState = GameState.Victory;
-            Debug.Log("[MVPGameManager] Victory - All heroes defeated.");
-        }
+        Debug.Log($"[MVPGameManager] Hero {heroId} defeated. Wave director will decide whether the level is complete.");
+    }
+
+    public void NotifyAllWavesCleared()
+    {
+        if (!IsPlaying()) return;
+        if (heroManager != null && heroManager.HasAnyHero()) return;
+
+        CurrentState = GameState.Victory;
+        Debug.Log("[MVPGameManager] Victory - All configured hero waves cleared.");
     }
 
     public void NotifyHeroEscapedToEntrance(int heroId)

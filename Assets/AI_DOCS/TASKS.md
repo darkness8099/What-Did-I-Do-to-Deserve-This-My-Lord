@@ -210,9 +210,97 @@
 
 - `TASKS.md` 以“当前真实任务状态”为准。
 - `AI_WORKFLOW_LOG.md` 中旧的“后续建议任务”如果与后续正式编号冲突，应视为历史建议，不再作为编号依据。
-- 当前最新已落档任务为 `TASK-076`。**阶段 11 为收尾阶段，范围已冻结，不再新增编号。**
+- 当前最新已落档任务为 `TASK-095`。阶段 11 的范围冻结只约束当时的 Closeout；2026-08-08 起用户在换机后明确重启增量资源与玩法实装。
 - 阶段 10 完成情况：061→068（Grid 数据/邻格 → 规则移动 → 移动后生态检测 → HP/出生/死亡分流 → Bud → Flower → 阶段渲染 → tick 驱动+场景接线）；TASK-069 移动动画为视觉层先行。（阶段 10 已完成 061→068：Grid 数据/邻格 → 规则移动 → 移动后生态检测 → HP/出生/死亡分流 → Bud → Flower → 阶段渲染 → tick 驱动+场景接线；TASK-069 移动动画为视觉层先行。整条匍匐苔藓生命周期已可进 Play Mode 试玩）
 
 ---
 
 *每完成一个 Task，在此文件中将 `[ ]` 改为 `[x]`，并在 `AI_WORKFLOW_LOG.md` 追加记录。*
+
+---
+
+## 阶段 12：换机后增量美术实装
+
+- [x] **TASK-077** — 勇者四向行走资源接入：导入 12 张 48×48 PNG（n/s/e/w × 3 帧），统一 Hero Import Settings；创建四向 idle/walk 共 8 个循环 Clip 与 `anim_warrior_ctrl`，默认 `idle_s`；更新 `PF_Hero_Default`，并让 `HeroRenderer` / `HeroMover` 按实际移动方向切换动画。后续修正角色归属：旧 `hero_warrior_idle_00` 属于另一勇者，已移除旧像素并以 `hero_warrior_walk_s_01` 建立默认待机副本 `hero_warrior_idle_s_00`（保留原 GUID，避免场景引用断裂）。未进入 Play Mode，未修改或保存 Scene。
+  - 2026-08-08 同名美术修订重导：以 `E:\AI import workplace\heros_01` 的 12 张修订帧覆盖现有四向资源，全部保留 `.meta/GUID`；默认 `hero_warrior_idle_s_00` 同步为修订后的 `hero_warrior_walk_s_01`。动画、Controller 与 Prefab 引用复核通过，未保存脏场景。
+  - 2026-08-08 单格脚点对齐修正：勇者 Root 保持格子中心且 Scale=1，Bottom Center Sprite 所在 `Visual` 下移半格；运行时创建逻辑与 `PF_Hero_Default` 已同步，静态 bounds 精确覆盖 `[0,1]×[0,1]`。未进入 Play Mode，等待人工视觉验收。
+
+---
+
+## 阶段 13：战斗交互细节修正
+
+- [x] **TASK-078** — 修正怪物战斗占用、勇者单体锁定与同格群殴：怪物进入勇者攻击范围后立即暂停移动、移动 HP 消耗、养分吸放与生命周期；勇者普通攻击锁定一个确切 `MonsterData`，不把同格目标误当范围伤害；每个处于攻击范围内的 Crawling 怪物均可独立攻击勇者，因此同格复数怪物可以群攻。Bud / Flower 保持被动不反击，但接战期间同样暂停生态阶段推进。未进入 Play Mode，未修改或保存 Scene。
+- [x] **TASK-079** — 魔王重新摆放阶段冻结怪物模拟并保留动画：`DemonLordManager.IsWaitingForPlacement` 为暂停信号；`EcologyTickDriver` 暂停精确 / 降频 / 区域聚合 tick、诊断计时和视图刷新，不累计待补算时间；`MonsterViewMover` 冻结视图坐标插值；`MonsterRenderer` 捕获每个怪物当前 Animator 状态并在原状态内循环采样，摆放成功后恢复原速度与状态机。未使用 `Time.timeScale`，因此相机与放置输入正常。未进入 Play Mode，未修改或保存 Scene。
+
+---
+
+## 阶段 14：关卡勇者配置与多波进攻框架
+
+- [x] **TASK-080** — 建立配置数据层：新增 `HeroArchetypeConfig`、`HeroSpawnEntryConfig`、`HeroWaveConfig`、`HeroLevelConfig`；勇者职业配置承载战斗属性和表现引用，关卡配置按“关卡 → 波次 → 出生项”组织，并保留运行时默认配置兼容旧流程。
+- [x] **TASK-081** — 勇者生成改为配置驱动：`HeroData` 从职业配置复制独立运行时快照；`HeroManager` 支持指定职业生成；`HeroRenderer` 优先使用职业 Sprite / Animator；建立 `hero_warrior.asset` 与 `hero_level_001.asset`，第一关当前仍为 10 秒准备、1 波、1 名 Warrior。
+- [x] **TASK-082** — 新增 `HeroWaveDirector`：每波执行“准备倒计时 → 请求重新摆放魔王 → 等待合法落位 → 按出生项生成本波勇者 → 等待本波全部死亡”；只有上一波全部勇者死亡后才开始下一波倒计时，只有全部配置波次清空才触发 Victory。组件由 `HeroMover` 运行时添加，不修改或保存 Scene。
+- [x] **TASK-083** — 多勇者捕获与魔王掉落规则：同一时间仅一名勇者能成为携带者，捕获失败的其他勇者继续追踪；携带者死亡时，魔王停留在当前拖拽位置并恢复为可捕获单位；若本波仍有勇者可继续争夺，若本波全灭则魔王在波间等待期保持原位，下一波倒计时结束后玩家可再次摆放。单个勇者死亡不再提前触发 Victory。
+
+---
+
+## 阶段 15：新增勇者职业美术模板
+
+- [x] **TASK-084** — 接入外部已审批职业模板：从 `D:\可能可以用\最终结果\AI_ASSETS\Processed` 分五个子批导入 Warrior02、Mage01/02、Priest01/02，共 60 张 48×48 四向移动帧；统一 Characters Import Settings；每职业创建四向 idle/walk 共 8 个 Clip、8-state Controller 与独立 `HeroArchetypeConfig`。新职业暂复制 Warrior 中性数值，仅作为可配置职业池，不修改 `hero_level_001` 波次内容。
+
+---
+
+## 阶段 16：低素材战斗表现
+
+- [x] **TASK-085** — 用程序化表现补足普通攻击素材：勇者攻击时面向目标，攻击者只移动 `Visual` 子节点做 0.22 格短距离撞击往返；怪物反击阶段让所有有效 Crawling 攻击者同步撞向勇者，保持同格群殴的个体伤害结算。受击目标临时切换为纯白剪影材质后恢复原 URP 2D Lit 材质；重叠闪白使用引用计数避免提前恢复。伤害在撞击点结算，并扣除表现耗时以保持配置的 AttackSpeed 节奏。死亡动画与技能特效本次不新增。未进入 Play Mode，未修改或保存 Scene。
+
+---
+
+## 阶段 17：Demo 游戏流程与菜单外壳
+
+- [x] **TASK-086** — 建立单场景 Demo UI 闭环：启动 `GameScene` 时显示全屏主菜单并暂停世界；Start Game 进入游戏，右上角 Menu / Esc 打开暂停菜单；暂停菜单支持继续、设置、重开、返回主菜单；Victory / Defeat 结算页支持 Retry、设置、返回主菜单。设置包含主音量、全屏开关和 1280×720 / 1600×900 / 1920×1080 三档 16:9 分辨率，并通过 PlayerPrefs 保留。返回主菜单 / 重开时重载当前 GameScene 并清空静态游离资源。全部 UI 继续使用 Unity 原生运行时组件和英文占位文案，不新增正式 UI 美术；未新增 Scene、未修改 Build Settings、未保存 GameScene。
+
+---
+
+## 阶段 18：特效素材池入库
+
+- [x] **TASK-087** — 整理用户筛选后的 Unity 包特效：将 147 张序列 PNG 按 Projectiles / Attacks / Blood / Explosions / Smoke 分类，统一为 `fx_<event>_<variant>_<frame>` 命名及 Sprite/Single、PPU 48、Point、Uncompressed、no mipmap、Clamp、Center Pivot；保留并规范化 2 个 AnimationClip 与 2 个 AnimatorController。全部通过 AssetDatabase 迁移且 GUID / 帧引用保持有效，`_Incoming` 恢复为空；本轮不绑定技能、战斗逻辑或 Prefab。
+
+---
+
+## 阶段 19：背景音乐素材池入库
+
+- [x] **TASK-088** — 整理 11 条背景音乐：按明确循环信息分为 `Assets/Audio/Music/Loops`（7）与 `FullTracks`（4），统一 `bgm_<name>[_loop|_full]` 命名；全部设为 44.1kHz 立体声 Streaming / Vorbis Quality 0.7 / 后台加载 / 不预载。AssetDatabase 迁移前后 GUID 保持不变，`_Incoming` 恢复为空；本轮不创建 AudioSource、不绑定菜单 / 关卡 / 战斗播放逻辑。
+
+---
+
+## 阶段 20：UI 美术素材池接入
+
+- [x] **TASK-089** — 处理 Fun Basic Pixel Art UI 的 `Buttons` 子集：从外部 PSD / 对应 PNG 导出中提取 4 张空白主按钮与 36 张通用图标状态，统一 UI Sprite 导入设置；按钮设 4px 九宫格边框。另生成原创英文 ASCII 像素 TTF `ui_font_demo_pixel`，支持动态字号与 Bold；不使用包内 `Text1/Text2`，不含中文。本轮只入库，不修改 `MVPResultUI`、Prefab 或 Scene。
+- [x] **TASK-090** — 处理 `Main_menu.psd`：提取 1 张 80×168 空白长面板与 4 张 56×12 空白菜单按钮状态；按钮统一 3px 九宫格边框。源文件没有可编辑文字层，Resume / Restart / Settings 等烘焙标签不入库，后续统一由 `ui_font_demo_pixel` 生成。未修改 UI 代码、Prefab 或 Scene。
+- [x] **TASK-091** — 处理 `Settings.psd`：提取 1 张 98×149 空白设置面板、1 张 63×13 可拉伸下拉字段、4 张 39×13 紧凑按钮状态、2 张 3×11 音量条激活 / 未激活段；复用 TASK-089 已入库的 Home / Play / OpenList / Sound / Music / Fullscreen / WindowMode 图标，不重复导入。未修改 UI 代码、Prefab 或 Scene。
+
+---
+
+## 阶段 21：Demo UI 正式像素皮肤实装
+
+- [x] **TASK-092** — 将 TASK-089～091 的现有 UI 资源接入单场景 Demo 流程：新增可构建的 `Resources/UI/demo_ui_theme` 主题配置；Main Menu / Pause / Result 使用长面板、菜单按钮与 Play / Home / OpenList 图标，Settings 使用设置面板、紧凑按钮、下拉字段、Sound / Fullscreen / WindowMode 图标及 16 段音量条；所有运行时文本统一切换为 `ui_font_demo_pixel`，按钮四态使用 SpriteSwap。保留 `DemoGameFlow` 与单场景状态逻辑，不新增或保存 Scene，不修改 Build Settings。
+  - 2026-08-09 按人工视觉反馈修正：所有可交互按钮取消左侧图标，只保留严格居中的文字；按钮文字统一使用对称内边距。Settings 的音量状态 Sound 图标保留，但不属于按钮内容。
+  - 2026-08-09 主菜单信息层级修正：移除占位标题 `DUNGEON LORD`，以两行自适应的 `WHAT DID I DO TO / DESERVE THIS, MY LORD` 作为正式主标题；主菜单面板横向扩至 552，底部改为 `MINIMUM PLAYABLE DEMO / VERSION 0.1.0`。
+
+---
+
+## 阶段 22：Demo 阶段背景音乐调度
+
+- [x] **TASK-093** — 接入最小阶段 BGM：主菜单循环 `bgm_magical_major_theme_07`；初始准备、每波魔王摆放与非最终波全灭后的下一波倒计时统一视为非入侵阶段，每次重新进入该阶段时从 `bgm_dream_on_loop`、`bgm_simple_positive_01_loop`、`bgm_simple_positive_04_loop` 中重新随机一首并持续循环；魔王落位完成、进入本波生成流程起至本波最后一名勇者死亡期间循环 `bgm_magic_within_loop`。`HeroWaveDirector` 显式暴露 `Preparing / WaitingForDemonLordPlacement / Invading / Completed` 阶段，避免按场上勇者数量误判出生延迟空档。暂停菜单与其 Settings 叠层暂停当前 AudioSource 并保持原曲 / 原播放位置；主菜单虽同为 `Time.timeScale=0`，仍按 UI 状态正常播放。胜负页暂时静音，等待后续专属音乐。通过 `Resources/Audio/demo_bgm_library` 保存构建可用的直接引用，不修改或保存 Scene。
+
+---
+
+## 阶段 23：Demo 波次勇者槽位化配置
+
+- [x] **TASK-094** — 将 `HeroWaveConfig` 从“职业批次（职业 + Count + 首次延迟 + 同类间隔）”简化为 `Heroes` 独立槽位列表：每一行只代表一个确切勇者，只保留职业引用与该勇者相对本波入侵开始的 `SpawnDelay`；删除序列化 `Count / FirstSpawnDelay / SpawnInterval`，`HeroWaveDirector` 每槽位只生成一个个体。`hero_level_001` 改为两波：Wave 1（准备 10 秒）=`Warrior`；Wave 2（准备 10 秒）=`Warrior + Warrior 02`，三者当前 `SpawnDelay=0`。保留运行时默认单波回退，不修改或保存 Scene。
+
+---
+
+## 阶段 24：后导入勇者横向美术纠正
+
+- [x] **TASK-095** — 修正 `warrior_02`、`mage_01/02`、`priest_01/02` 五套职业模板的东西方向误标：逐帧交换 15 对 `walk_e / walk_w` PNG 像素内容（共 30 张），保持规范文件名、`.meta` 与 GUID 不变；首套方向正确的 `hero_warrior` 不动。20 个横向 idle/walk Clip、70 个 Sprite 关键帧及 20 个 Controller 状态原本已按方向同名引用，因此无需改动画资产，换图后引用自动得到正确画面。未进入 Play Mode，未修改或保存 Scene。

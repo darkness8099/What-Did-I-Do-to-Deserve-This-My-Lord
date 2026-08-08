@@ -69,10 +69,10 @@
 | **Hero** | `hero_<class>_<state>_<index>` | `hero_warrior_idle_00`、`hero_warrior_walk_e_00`、`hero_warrior_attack_00` |
 | **Monster** | `monster_<species>_<state>_<index>` | `monster_slime_idle_00`、`monster_slime_attack_00`、`monster_slime_death_00` |
 | **DemonLord** | `demonlord_<state>_<index>` | `demonlord_idle_00`、`demonlord_captured_00` |
-| **UI Icon** | `ui_icon_<name>` | `ui_icon_hp`、`ui_icon_attack`、`ui_icon_magic` |
+| **UI Icon** | `ui_icon_<name>[_<variant>]_<state>` | `ui_icon_home_normal`、`ui_icon_sound_02_hover` |
 | **UI Panel** | `ui_panel_<name>` | `ui_panel_victory`、`ui_panel_defeat`、`ui_panel_pause` |
-| **UI Button** | `ui_btn_<name>_<state>` | `ui_btn_restart_normal`、`ui_btn_restart_hover` |
-| **UI Font** | `ui_font_<name>` | `ui_font_title`、`ui_font_body` |
+| **UI Button** | `ui_btn_<name>_<state>` | `ui_btn_primary_normal`、`ui_btn_primary_hover_pressed` |
+| **UI Font** | `ui_font_<name>` | `ui_font_demo_pixel`、`ui_font_body` |
 | **Background** | `bg_<name>_<index>` | `bg_dungeon_00`、`bg_overworld_00` |
 | **Entrance**（多格大尺寸） | `entrance_<name>_<index>` 或简化 `entrance_<index>` | `entrance_cave_00`、`entrance_00..04`（程序化池） |
 | **Building** | `building_<name>_<index>` 或简化 `building_<index>` | `building_house_00`、`building_00..02` |
@@ -80,6 +80,8 @@
 | **Vegetation** | `veg_<name>_<index>` 或简化 `veg_<index>` | `veg_grass_00`、`veg_00..04` |
 | **Prop** | `prop_<name>_<index>` 或简化 `prop_<index>` | `prop_chest_00`、`prop_00..10` |
 | **FX** | `fx_<event>_<index>` | `fx_dig_00`、`fx_hit_00`、`fx_slime_spawn_00` |
+| **BGM** | `bgm_<name>[_<variant>]` | `bgm_battle_march_loop`、`bgm_dream_on_full` |
+| **SFX**（未来） | `sfx_<event>[_<variant>]` | `sfx_ui_confirm`、`sfx_attack_hit_01` |
 | **Sprite Sheet（合集）** | 上述 + `_sheet` 后缀 | `monster_slime_idle_sheet`、`hero_warrior_walk_sheet` |
 | **Material** | `mat_<对应资源名>` | `mat_tile_soil`、`mat_monster_slime` |
 | **Animation Clip** | `anim_<对应角色>_<state>` | `anim_slime_idle`、`anim_warrior_walk` |
@@ -88,6 +90,27 @@
 
 > **方向后缀**（仅在需要朝向时使用）：`e`（east 右）/ `w`（west 左）/ `n`（north 上）/ `s`（south 下）。
 > 例：`hero_warrior_walk_e_00`。
+
+### UI 交互状态
+
+- 当前按钮包的四态为 `normal` / `hover` / `pressed` / `hover_pressed`。
+- `hover_pressed` 表示亮色悬停外观下继续按下，不得误命名为 `disabled`。
+- 当源素材没有独立禁用态时，运行时可用颜色或透明度表达；不要伪造不存在的源状态。
+
+### 像素序列 FX 命名
+
+- 一组逐帧特效使用 `fx_<event>_<variant>_<frame>`；`variant` 优先写可辨识颜色或用途变体，`frame` 从 `_00` 连续递增。
+- 示例：`fx_attack_impact_purple_00..03`、`fx_explosion_burst_cyan_00..05`。
+- 对应动画资产使用 `anim_fx_<event>_<variant>.anim` 与 `anim_fx_<event>_<variant>_ctrl.controller`。
+- 原供应商编号只记录在 `ART_INTAKE_LOG.md`，不进入正式文件名。
+
+### 音频命名
+
+- 背景音乐统一使用 `bgm_`，保留可辨识的原曲名语义并转为小写 snake_case。
+- 交付文件明确标注可循环时加 `_loop`；没有明确循环信息时不得仅凭听感擅自加 `_loop`。
+- 同一曲目同时保留完整与循环版本时，完整版本加 `_full` 以消除歧义。
+- 曲目原编号使用两位数，例如 `theme_02`；文件扩展名保留原交付格式。
+- 运行时用途（主菜单 / 地下城 / 战斗 / 胜负）不写进文件名，等用户指定后由配置或播放逻辑引用。
 
 ---
 
@@ -131,7 +154,7 @@
 
 ## 五、Hero 命名映射本项目勇者
 
-当前 `HeroData` 没有兵种区分，默认 `class` 用 `warrior`。未来扩展时按职业命名（`warrior` / `mage` / `archer` 等）。
+当前勇者由 `HeroArchetypeConfig` 区分职业/模板。首套 Warrior 保留 `warrior`；同职业或同职业多套外观使用带两位编号的 class key，例如 `warrior_02`、`mage_01`、`priest_02`。完整文件名仍按 `hero_<class>_<state>_<direction>_<frame>` 组合。
 
 | 状态 | 文件名示例 |
 |---|---|
@@ -140,6 +163,8 @@
 | Walk West | `hero_warrior_walk_w_00.png` |
 | Attack | `hero_warrior_attack_00.png` |
 | Death | `hero_warrior_death_00.png` |
+
+已接入的多模板示例：`hero_warrior_02_walk_s_01.png`、`hero_mage_01_walk_n_00.png`、`hero_priest_02_walk_e_02.png`。
 
 ---
 
@@ -166,7 +191,6 @@
 以下命名约定暂不规定，待真正需要时再补：
 
 - 多语言文本资源（`txt_*` / `loc_*` 等）
-- 音效 / 音乐（`sfx_*` / `bgm_*` 等，本项目 MVP 无音效）
 - 后处理 Volume Profile
 - Light2D / 阴影遮罩
 - VFX Graph / Shader Graph 资源

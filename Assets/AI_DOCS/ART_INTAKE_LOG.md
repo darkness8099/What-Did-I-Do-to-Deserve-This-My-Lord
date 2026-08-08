@@ -11,8 +11,8 @@
 |---|---|
 | **批次日期** | YYYY-MM-DD，对应美术交付当天 |
 | **批次名** | 与目录名一致，如 `2026-06-01_slime_pack_v1` |
-| **件数** | 本批最终落入 `Assets/Art/<category>/` 的文件数（不含 .meta、不含丢弃件） |
-| **类别** | 涉及的资源类别（Tiles / Heroes / Monsters / DemonLord / UI / Backgrounds / Props / FX） |
+| **件数** | 本批最终落入 `Assets/Art/<category>/` 或 `Assets/Audio/<category>/` 的文件数（不含 .meta、不含丢弃件） |
+| **类别** | 涉及的资源类别（Tiles / Heroes / Monsters / DemonLord / UI / Backgrounds / Props / FX / Audio） |
 | **处理结果** | OK / 部分接入 / 退回，简短一句话说明 |
 | **执行人** | 人类 / AI 协助（标注是谁主导） |
 
@@ -60,3 +60,74 @@
 | Date | Batch | Count | Category | Result | Operator |
 |---|---|---:|---|---|---|
 | 2026-06-13 | legacy_slime_idle_cleanup_v1 | 1 删除 | Monsters | OK - 删除旧测试素材 `monster_slime_idle_00`（连同 .meta）。删除前已把唯二引用重指向到新默认帧 `monster_slime_move_00`：`PF_Monster_Slime_Default.prefab` 的 SpriteRenderer 与 `GameScene` 内 `MonsterRenderer.spriteSlime`。验证：Console 0 Error，全工程 0 残留 GUID 引用。 | AI 协助 |
+
+## 2026-08-08 hero_directional_walk_pack_v1
+
+| Date | Batch | Count | Category | Result | Operator |
+|---|---|---:|---|---|---|
+| 2026-08-08 | hero_directional_walk_pack_v1 - Heroes | 12 | Heroes | OK - Imported 48×48 directional frames to `Art/Characters/Heroes/`: `hero_warrior_walk_{n,s,e,w}_00..02`; PPU 48 / Point / Uncompressed / no mipmap / Bottom Center. Source frame `01`（原始交付第 2 帧）作为各方向中立站姿。 | AI 协助 |
+| 2026-08-08 | hero_directional_walk_pack_v1 - Animations | 9 | Animations | OK - Added 8 looping clips under `Animations/Heroes/` (`idle/walk × n/s/e/w`) plus `Resources/Hero/anim_warrior_ctrl.controller`; walk cycle is `00→01→02→01→00`, default state is `idle_s`. | AI 协助 |
+
+## 2026-08-08 hero_idle_identity_fix_v1
+
+| Date | Batch | Count | Category | Result | Operator |
+|---|---|---:|---|---|---|
+| 2026-08-08 | hero_idle_identity_fix_v1 | 1 replaced / renamed | Heroes | OK - Confirmed legacy `hero_warrior_idle_00` belonged to a different Hero. Removed its old pixel content, copied the new Hero's `hero_warrior_walk_s_01` neutral pose, and renamed the default idle asset to `hero_warrior_idle_s_00`. Preserved the original `.meta` GUID so `GameScene`, `PF_Hero_Default`, and `anim_hero_warrior_idle_s` remain valid without saving the dirty Scene. | AI 协助 |
+
+## 2026-08-08 hero_directional_walk_revision_v2
+
+| Date | Batch | Count | Category | Result | Operator |
+|---|---|---:|---|---|---|
+| 2026-08-08 | hero_directional_walk_revision_v2 | 12 replaced + 1 idle refreshed | Heroes | OK - Replaced `hero_warrior_walk_{n,s,e,w}_00..02` from the corrected same-name delivery while preserving every `.meta/GUID`; regenerated `hero_warrior_idle_s_00` from corrected `hero_warrior_walk_s_01`. All 13 sprites remain Sprite/Single, PPU 48, Point, Uncompressed, no mipmap, Clamp, Bottom Center. | AI 协助 |
+
+## 2026-08-08 hero_profession_templates_v1
+
+| Date | Batch | Count | Category | Result | Operator |
+|---|---|---:|---|---|---|
+| 2026-08-08 | hero_profession_templates_v1 - Heroes | 60 | Heroes | OK - Imported approved Warrior02, Mage01/02 and Priest01/02 directional frames as `hero_<class>_walk_{n,s,e,w}_00..02`; all are 48×48 Sprite/Single, PPU 48, Point, Uncompressed, no mipmap, Clamp, Bottom Center. Processed as five 12-file sub-batches. | AI 协助 |
+| 2026-08-08 | hero_profession_templates_v1 - Animations | 45 | Animations | OK - Added 40 looping clips (`idle/walk × n/s/e/w × 5`) and 5 Resources controllers. Walk sequence is `00→01→02→01→00`, 8 FPS; each controller has 8 states and defaults to `idle_s`. | AI 协助 |
+| 2026-08-08 | hero_profession_templates_v1 - Archetypes | 5 | Hero Configs | OK - Added `hero_warrior_02`, `hero_mage_01/02`, `hero_priest_01/02` archetypes with independent Sprite/Controller references. Neutral Warrior stats are temporary placeholders; Level 1 wave content was not changed. | AI 协助 |
+
+## 2026-08-09 hero_profession_direction_fix_v1
+
+| Date | Batch | Count | Category | Result | Operator |
+|---|---|---:|---|---|---|
+| 2026-08-09 | hero_profession_direction_fix_v1 | 30 corrected | Heroes | OK - Corrected swapped east/west pixel payloads for Warrior02, Mage01/02 and Priest01/02 across frames `00..02`; retained all filenames, `.meta` files and GUIDs. Existing idle/walk clips and controllers already referenced direction-matched sprite paths, so no animation assets required modification. Original `hero_warrior` was intentionally untouched. | AI 协助 |
+
+## 2026-08-08 unity_fx_sprite_pack_v1
+
+| Date | Batch | Count | Category | Result | Operator |
+|---|---|---:|---|---|---|
+| 2026-08-08 | unity_fx_sprite_pack_v1 - Projectiles | 30 | FX / Projectiles | OK - `AR101/102/103/105/106` mapped to `fx_projectile_chevron_{red,green,cyan,pink,purple}_00..05`. | AI 协助 |
+| 2026-08-08 | unity_fx_sprite_pack_v1 - Attacks | 66 | FX / Attacks | OK - `ATFX101..106` mapped to six-color `fx_attack_impact_*_00..03`; `S6012_01..07` mapped to seven-color `fx_attack_sweep_*_00..05`. | AI 协助 |
+| 2026-08-08 | unity_fx_sprite_pack_v1 - Blood | 9 | FX / Blood | OK - `B101` mapped to `fx_blood_burst_red_00..04`; `FL203` mapped to `fx_blood_arc_red_00..03`. | AI 协助 |
+| 2026-08-08 | unity_fx_sprite_pack_v1 - Explosions | 36 | FX / Explosions | OK - `EXP001..006` mapped to `fx_explosion_burst_{cyan,green,purple,yellow,red,white}_00..05`. | AI 协助 |
+| 2026-08-08 | unity_fx_sprite_pack_v1 - Smoke | 6 | FX / Smoke | OK - `SM301` mapped to `fx_smoke_ring_purple_00..05`. | AI 协助 |
+| 2026-08-08 | unity_fx_sprite_pack_v1 - Animation Assets | 4 | Animations / FX | OK - Preserved and renamed the supplied green-chevron and red-blood-burst AnimationClip / AnimatorController pairs; all sprite references and GUIDs remain valid. | AI 协助 |
+
+## 2026-08-09 bgm_music_pack_v1
+
+| Date | Batch | Count | Category | Result | Operator |
+|---|---|---:|---|---|---|
+| 2026-08-09 | bgm_music_pack_v1 - Loops | 7 | Audio / Music / Loops | OK - Renamed and archived as `bgm_battle_march_loop`, `bgm_dream_on_loop`, `bgm_journey_into_fog_loop`, `bgm_knight_power_loop`, `bgm_magic_within_loop`, `bgm_simple_positive_01_loop`, `bgm_simple_positive_04_loop`. | AI 协助 |
+| 2026-08-09 | bgm_music_pack_v1 - FullTracks | 4 | Audio / Music / FullTracks | OK - Renamed and archived as `bgm_dream_on_full`, `bgm_magical_major_theme_02`, `bgm_magical_major_theme_07`, `bgm_simple_positive_04_full`. | AI 协助 |
+
+## 2026-08-09 fun_basic_pixel_ui_buttons_v1
+
+| Date | Batch | Count | Category | Result | Operator |
+|---|---|---:|---|---|---|
+| 2026-08-09 | fun_basic_pixel_ui_buttons_v1 - Buttons | 4 | UI / Buttons | OK - Extracted one blank primary button family as `normal / hover / pressed / hover_pressed`; Sprite/Single, PPU 48, Point, Uncompressed, no mipmap, Clamp, Center Pivot, 4px sliced border. | AI 协助 |
+| 2026-08-09 | fun_basic_pixel_ui_buttons_v1 - Icons | 36 | UI / Icons | OK - Extracted Home, Play, Fullscreen01, OpenList, WindowMode01, Sound01/02 and Music01/02 with the same four source states. | AI 协助 |
+| 2026-08-09 | fun_basic_pixel_ui_buttons_v1 - Font | 1 | UI / Fonts | OK - Generated original dynamic ASCII pixel TTF `ui_font_demo_pixel`; covers English letters, digits and current Demo punctuation at runtime sizes / Bold. Uncommon symbols use a placeholder box; no CJK glyphs. | AI 协助 |
+
+## 2026-08-09 fun_basic_pixel_ui_main_menu_v1
+
+| Date | Batch | Count | Category | Result | Operator |
+|---|---|---:|---|---|---|
+| 2026-08-09 | fun_basic_pixel_ui_main_menu_v1 | 5 | UI / Panels / Buttons | OK - Extracted `ui_panel_menu_tall` plus the blank `ui_btn_menu_*` four-state family. Menu labels remain runtime text; buttons use 3px sliced borders. | AI 协助 |
+
+## 2026-08-09 fun_basic_pixel_ui_settings_v1
+
+| Date | Batch | Count | Category | Result | Operator |
+|---|---|---:|---|---|---|
+| 2026-08-09 | fun_basic_pixel_ui_settings_v1 | 8 | UI / Panels / Buttons / Icons | OK - Extracted the blank Settings panel, stretchable dropdown field, compact four-state button family, and active / inactive meter segments. Reused the matching common icons already archived by TASK-089 instead of importing duplicates. | AI 协助 |

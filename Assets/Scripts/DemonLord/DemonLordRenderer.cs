@@ -76,6 +76,22 @@ public class DemonLordRenderer : MonoBehaviour
         go.transform.position = endPos;
     }
 
+    public bool DropCaptiveDemonLord(int heroId, Vector2Int gridPos)
+    {
+        if (!captives.TryGetValue(heroId, out GameObject captive)) return false;
+
+        captives.Remove(heroId);
+        if (captive != null) Destroy(captive);
+
+        if (demonLordView == null)
+            demonLordView = CreateView("DemonLord", gridPos);
+        else
+            demonLordView.transform.position = GridToWorld(gridPos);
+
+        Debug.Log($"[DemonLordRenderer] DemonLord view dropped at ({gridPos.x},{gridPos.y}).");
+        return true;
+    }
+
     private GameObject CreateView(string objectName, Vector2Int gridPos)
     {
         var go = new GameObject(objectName);

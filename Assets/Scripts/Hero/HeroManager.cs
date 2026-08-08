@@ -23,6 +23,11 @@ public class HeroManager : MonoBehaviour
 
     public int SpawnHeroAtEntrance()
     {
+        return SpawnHeroAtEntrance(HeroArchetypeConfig.RuntimeDefault);
+    }
+
+    public int SpawnHeroAtEntrance(HeroArchetypeConfig archetype)
+    {
         if (gridManager == null)
         {
             Debug.LogWarning("[HeroManager] SpawnHeroAtEntrance: GridManager is null.");
@@ -37,10 +42,10 @@ public class HeroManager : MonoBehaviour
         }
 
         int id = nextHeroId++;
-        heroes[id]        = new HeroData();
+        heroes[id]        = new HeroData(archetype);
         heroPositions[id] = entrance;
 
-        Debug.Log($"[HeroManager] Hero #{id} spawned at Entrance {entrance}.");
+        Debug.Log($"[HeroManager] Hero #{id} ({heroes[id].ArchetypeId}) spawned at Entrance {entrance}.");
         return id;
     }
 
@@ -86,8 +91,19 @@ public class HeroManager : MonoBehaviour
         return heroes.Count > 0;
     }
 
+    public int HeroCount => heroes.Count;
+
     private Vector2Int FindEntrance()
     {
         return gridManager.GetEntrancePosition();
+    }
+
+
+public void CollectPositions(List<Vector2Int> buffer)
+    {
+        if (buffer == null) return;
+        buffer.Clear();
+        foreach (KeyValuePair<int, Vector2Int> pair in heroPositions)
+            buffer.Add(pair.Value);
     }
 }

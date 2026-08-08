@@ -26,7 +26,11 @@ public class LevelConfig : MonoBehaviour
     [SerializeField] private int initialSlimeMaxVisualIndex = 5;
 
     [Header("Hero Flow")]
+    [SerializeField] private int currentLevelNumber = 1;
+    [SerializeField] private HeroLevelConfig heroLevelSchedule;
     [SerializeField] private float heroSpawnDelaySeconds = 10f;
+
+    private HeroLevelConfig runtimeHeroLevelFallback;
 
     [Header("Camera View")]
     [SerializeField] private float cameraViewColumns = 30f;
@@ -50,9 +54,23 @@ public class LevelConfig : MonoBehaviour
         ResolveEntranceColumn(),
         Mathf.Clamp(ResolveEntranceY() - demonLordCellsBelowEntrance, 0, height - 1));
     public float HeroSpawnDelaySeconds => Mathf.Max(0f, heroSpawnDelaySeconds);
+    public int CurrentLevelNumber => Mathf.Max(1, currentLevelNumber);
     public float CameraViewColumns => Mathf.Max(1f, cameraViewColumns);
     public float CameraViewRows => Mathf.Max(1f, cameraViewRows);
     public Vector2 CameraStartCenter => new Vector2(width * 0.5f, height * 0.5f);
+
+    public HeroLevelConfig GetHeroLevelConfig()
+    {
+        if (heroLevelSchedule != null) return heroLevelSchedule;
+
+        string resourcePath = $"Hero/Levels/hero_level_{CurrentLevelNumber:000}";
+        heroLevelSchedule = Resources.Load<HeroLevelConfig>(resourcePath);
+        if (heroLevelSchedule != null) return heroLevelSchedule;
+
+        if (runtimeHeroLevelFallback == null)
+            runtimeHeroLevelFallback = HeroLevelConfig.CreateRuntimeDefault(CurrentLevelNumber, HeroSpawnDelaySeconds);
+        return runtimeHeroLevelFallback;
+    }
 
     public void ApplyInitialGrid(GridData gridData)
     {

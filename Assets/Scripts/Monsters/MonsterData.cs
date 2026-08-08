@@ -346,4 +346,20 @@ public class MonsterData
 
     // Lifecycle tick reserved (future: hunger++, behavior step).
     public void Tick() { }
+
+
+public void RestoreSimulationState(int hp, int nutrient, int magic, Vector2Int direction)
+    {
+        CurrentHP = Mathf.Clamp(hp, 1, MaxHP);
+        CurrentNutrient = Mathf.Clamp(nutrient, 0, NutrientCapacity);
+        CurrentMagic = Mathf.Clamp(magic, 0, MagicCapacity);
+
+        if (Mathf.Abs(direction.x) + Mathf.Abs(direction.y) != 1)
+            direction = Vector2Int.right;
+        MoveDirection = direction;
+
+        MovesSinceEcology = 0;
+        MovesSinceHpCost = 0;
+        SpawnReadyTime = 0f;
+    }
 }

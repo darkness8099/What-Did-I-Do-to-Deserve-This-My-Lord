@@ -8,6 +8,9 @@ public class MonsterViewMover : MonoBehaviour
 
     private Vector3 target;
     private bool hasTarget;
+    private bool movementPaused;
+
+    public bool IsMovementPaused => movementPaused;
 
     public void SnapTo(Vector3 worldPos)
     {
@@ -22,9 +25,14 @@ public class MonsterViewMover : MonoBehaviour
         hasTarget = true;
     }
 
+    public void SetMovementPaused(bool paused)
+    {
+        movementPaused = paused;
+    }
+
     private void Update()
     {
-        if (!hasTarget) return;
+        if (!hasTarget || movementPaused) return;
         float step = Mathf.Max(0.01f, speed) * Time.deltaTime;
         transform.position = Vector3.MoveTowards(transform.position, target, step);
     }

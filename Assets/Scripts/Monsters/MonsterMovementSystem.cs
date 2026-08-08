@@ -43,10 +43,10 @@ public static class MonsterMovementSystem
 
     // Apply one movement step for `monster`. Terrain-only traversability (passes through other monsters).
     // Updates facing always; on a successful move updates the monster's Position. Returns whether it changed cells.
-    public static bool TryMoveStep(MonsterData monster, GridManager grid, out Vector2Int newPos)
+public static bool TryMoveStep(MonsterData monster, GridManager grid, MonsterManager manager, out Vector2Int newPos)
     {
         newPos = monster != null ? monster.Position : Vector2Int.zero;
-        if (monster == null || grid == null) return false;
+        if (monster == null || grid == null || manager == null) return false;
 
         System.Func<Vector2Int, bool> canEnter = c => grid.IsMonsterTraversable(c.x, c.y);
 
@@ -54,8 +54,8 @@ public static class MonsterMovementSystem
         bool moved = ComputeNextStep(monster.Position, monster.MoveDirection, canEnter, out to, out nd);
         monster.SetMoveDirection(nd);
         if (!moved) return false;
+        if (!manager.Move(monster, to)) return false;
 
-        monster.SetPosition(to);
         newPos = to;
         return true;
     }

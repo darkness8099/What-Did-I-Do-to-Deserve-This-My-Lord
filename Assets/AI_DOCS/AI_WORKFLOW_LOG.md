@@ -3671,3 +3671,236 @@ GridData → GridManager → GridRenderer → InputHandler（挖掘）
 - 删除已无用的 `SpawnCells` 数组。
 - **验证（A 类，未进 Play）**：refresh 0 Error；execute_code：花繁殖 5 只全在同格、各自延迟时间不同；Bud 占位仍生效（同格两 slime 仅 1 转 Bud）。
 - **同步**：`GAME_DESIGN_SLIME.md` §6.4（落位=同格 + 延迟 + 占位）。未改场景；未跑 git。
+
+### 2026-08-08 TASK-077 — 换机后勇者四向动画接入
+
+- **目标**：接入 `E:\AI import workplace\heros_01` 的四向勇者行走素材；默认初始化为向下站立。
+- **美术入库**：12 张透明 PNG，均为 48×48；按规范重命名为 `hero_warrior_walk_{n,s,e,w}_00..02`，进入 `Assets/Art/Characters/Heroes/`。Import Settings 统一为 Sprite/Single、PPU 48、Point、Uncompressed、no mipmap、Clamp、Bottom Center。
+- **动画资产**：创建 8 个循环 Clip（`idle/walk × n/s/e/w`），全部绑定 `Visual/m_Sprite`；中立站姿取每组原始第 2 帧（规范名 `_01`）；walk 采用 `00→01→02→01→00`、8 FPS。创建 `Assets/Resources/Hero/anim_warrior_ctrl.controller`，8 states，默认 `idle_s`。
+- **Prefab / 代码实装**：`PF_Hero_Default` Root 加 Animator 并接控制器，Visual 默认图设为 `hero_warrior_walk_s_01`；`HeroData` 默认朝向改为 Down；`HeroRenderer` 创建与 Clip 一致的 Root→Visual 层级、加载控制器并提供方向状态映射；`HeroMover` 在移动、停路、索敌和抵达目标时切换 walk/idle。
+- **换机 MCP 适配记录**：本机 Unity MCP `manage_asset(move)` 会在 `AssetDatabase.MoveAsset` 已实际成功、PNG 与 `.meta` 已同步迁移后仍返回 `MoveAsset call failed unexpectedly`。处理方式是每批调用后同时核对源/目标目录与 Unity AssetDatabase 搜索结果；没有手工重建 `.meta`，GUID 保持不变。
+- **验证（A/B 类，未进 Play）**：脚本编译 0 Error；12/12 Import Settings 正确；8/8 Clip 绑定、帧数与循环正确；Controller 8 states 且 default=`idle_s`；`Resources.Load` 成功；Prefab Animator/默认图正确；Hero 默认 Down；8/8 方向状态映射正确。
+- **边界**：未进入 Play Mode；未修改或保存 Scene；未改 ProjectSettings/Packages/Assets/Settings；未执行 git。
+- **C 类待人工**：进入 Play Mode 后观察勇者连续移动时四向切换是否自然、停止/索敌时是否停在正确朝向，以及 8 FPS 节奏是否需要微调。
+
+### 2026-08-08 TASK-077 修正 — 旧勇者 idle 归属错误
+
+- **用户反馈**：原 `hero_warrior_idle_00` 属于另一名勇者，不能与本批新勇者四向素材混用。
+- **引用审计**：旧 GUID `b66f9d8bc37e4004cac24878f5599672` 当时仅被 `GameScene.HeroRenderer.spriteHero` 引用；场景为 `isDirty=true`，因此没有修改或保存场景。
+- **处理方案（用户允许复制）**：将 `hero_warrior_walk_s_01` 的像素内容复制为默认待机资产，保留旧 `.meta/GUID` 以自动承接场景引用，并将文件规范化重命名为 `hero_warrior_idle_s_00`。旧 `hero_warrior_idle_00` 路径和旧勇者像素均已不存在。
+- **统一引用**：`anim_hero_warrior_idle_s` 的两帧与 `PF_Hero_Default/Visual` 默认 Sprite 均改为 `hero_warrior_idle_s_00`；walk_s 仍正常使用 `hero_warrior_walk_s_01` 作为中立步态帧。
+- **Import Settings**：新 idle 副本保持 Characters 规则：Sprite/Single、PPU 48、Point、Uncompressed、no mipmap、Clamp、Bottom Center。
+- **验证（A/B 类）**：idle 副本与 `walk_s_01` SHA-256 完全相同；旧路径不存在；GUID 未改变；Scene/Prefab/idle_s Clip 引用均有效；Controller 可 `Resources.Load`；Console 0 Error。
+- **边界**：未改代码；未进入 Play Mode；未保存 Scene；未改 ProjectSettings/Packages/Assets/Settings；未执行 git。
+
+### 2026-08-08 TASK-077 修订重导 — 勇者四向素材 v2
+
+- **来源与映射**：重新扫描 `E:\AI import workplace\heros_01`，确认共 12 张 48×48 PNG；Down/Up/Left/Right 映射为 `s/n/w/e`，原始 `01/02/03` 映射为规范编号 `00/01/02`。
+- **保引用覆盖**：只覆盖 `hero_warrior_walk_{n,s,e,w}_00..02.png` 的像素文件，未重建或修改 `.meta`；12/12 目标 SHA-256 与对应修订源一致，12/12 Meta 哈希与 GUID 覆盖前后不变。
+- **默认状态同步**：以修订后的 `hero_warrior_walk_s_01` 覆盖 `hero_warrior_idle_s_00` 的像素内容；二者 SHA-256 一致，idle 独立 GUID `b66f9d8bc37e4004cac24878f5599672` 保持不变。`PF_Hero_Default` 默认 Sprite 与 `anim_hero_warrior_idle_s` 均继续引用该 idle 资产。
+- **Import Settings（13/13）**：Sprite/Single、PPU 48、Point、Uncompressed、no mipmap、alpha transparency、Clamp、Bottom Center 全部通过 Unity AssetImporter 复核。
+- **动画/Prefab 验证**：8 个 Clip 均存在且 8 FPS/Loop 正常；walk 仍为 `00→01→02→01→00`，idle_s 使用独立 idle 副本；Controller 8 states、default=`idle_s`，`Resources.Load` 成功；Prefab 的 Animator Controller 与默认 Sprite 正确。
+- **美术审计**：Hero 13 张 PNG 命名问题 0；13/13 有 Meta；所有帧均被 idle/walk Clip 使用，无本批孤立资源；`Assets/Art/_Incoming` 无待处理非占位文件；Assets/Art 无 PSD/PSB/AI 等源格式残留。
+- **验证边界**：Unity MCP 在线且 Editor ready；Console 0 Error / 0 Warning；GameScene 在开始前已为 `isDirty=true`，本次未修改或保存 Scene；未进入 Play Mode；未改代码、ProjectSettings、Packages、Assets/Settings；未执行 git。
+- **C 类待人工**：Play Mode 下观察修订后勇者四向外观、脚底锚点、停止时向下默认形态及移动切向是否符合预期。
+
+### 2026-08-08 TASK-077 修正 — 勇者单格脚点对齐
+
+- **问题与根因**：Hero Sprite 为 48×48 / PPU 48 / Bottom Center，实际脚部像素贴画布底边；但 `HeroRenderer` 把 Root 放在格子中心 `(x+0.5,y+0.5)`，同时 Root Scale=0.85，导致脚底位于格子中心、上半身覆盖上一格。横向移动时因此出现悬空与墙砖穿帮感。
+- **运行时修正**：`HeroRenderer.CreateHeroView` 保持 Root 位于逻辑格中心并改为 Scale=1；`Visual.localPosition=(0,-0.5,0)`、Scale=1，使 Bottom Center 脚点落在格子下边界。`HeroMover` 的格中心插值与逻辑坐标不变。
+- **Prefab 同步**：`PF_Hero_Default` Root Scale=1，`Visual.localPosition=(0,-0.5,0)`、Scale=1；Sprite 与 AnimatorController 引用保持不变。当前运行时仍由 `HeroRenderer` 动态创建视图，本次同步 Prefab 是为了避免配置漂移。
+- **A/B 验证**：`HeroRenderer.cs` diagnostics 0 Error / 0 Warning；Console 0 Error / 0 Warning；Prefab 按 Sprite bounds 计算后的格内范围为 `left=0,right=1,bottom=0,top=1`；8 个 Hero Clip 均只绑定 `Visual/m_Sprite`，Transform 曲线为 0，不会覆盖偏移；GameScene `isDirty=false`。
+- **工具记录**：代码编译后的首次全量 refresh 曾返回一次 `Connection closed before reading expected bytes`；立即停止写入并复核，Unity 实例仍 running、domain reload 已完成、Editor ready，代码与 Prefab 均已正常落盘，后续只读验证全部通过。
+- **边界**：未进入 Play Mode；未修改或保存 Scene；未修改 Sprite/动画/ProjectSettings/Packages/Assets/Settings；未执行 git。
+- **C 类待人工**：Play Mode 下检查向左/向右连续移动时脚底是否贴住地道下边界、头部/武器是否仍覆盖上方墙砖、四向切换与停止帧是否自然；若仍有轮廓抖动，再单独处理 Pixel Perfect / 移动像素采样，不与本次锚点修正混做。
+
+### 2026-08-08 TASK-078 — 怪物战斗占用 / 单体锁定 / 同格群殴
+
+- **问题根因**：`EcologyTickDriver` 不知道勇者位置与战斗状态，怪物接敌后仍会移动、扣移动 HP、吸放养分和推进生命周期；`HeroMover` / `CombatSystem` 以格子坐标而不是稳定的 `MonsterData` 个体作为目标；怪物反击只结算勇者当前选中的一个目标，同格或相邻的其他怪物不会参战。
+- **怪物索引与查询**：`MonsterManager` 新增精确单体索敌、个体存活归属检查和战斗攻击者收集。攻击者查询使用已有空间索引，并按每个个体自己的 Manhattan `AttackRange` 过滤；魔物之间不阻挡、允许同格的规则保持不变。
+- **战斗占用**：`EcologyTickDriver.TickIndividual` 在常规阶段逻辑前检查勇者攻击范围；`TickCrawling` 移动后再次检查，处理“从两格外刚走入相邻格”的当帧接触。命中后立即暂停移动后 HP 消耗、养分吸放和生命周期。Bud / Flower 同样暂停阶段推进，但不加入攻击者列表。
+- **单体与群攻**：`HeroMover` 将确切 `MonsterData` 交给 `CombatSystem`。勇者每次普通攻击仅伤害当前个体，击杀后才重新索敌；每个反击阶段则收集勇者周围所有存活 Crawling 攻击者并逐个结算，所以同格复数怪物能够各自攻击一次。
+- **A 类验证（未进 Play）**：逻辑测试全部通过：精确目标引用；勇者一击只伤一个目标；同格两个攻击者均被收集并造成两次伤害；邻接冻结、远距离不冻结；Bud 被冻结但不反击；出生延迟个体不参战；移除目标后可重锁；空间索引一致。
+- **接触边界验证（未进 Play）**：匍匐苔藓从 `(8,10)` 移动到 `(9,10)`，与 `(10,10)` 勇者相邻后立即停住；HP 保持 `16`，携带养分保持 `0`，邻土养分保持 `5`，HP / 生态移动计数均保留为 `2`，空间索引验证通过。
+- **测试工具记录**：首次接触边界 harness 因 Edit Mode 动态添加的 `GridManager` 未自动初始化而出现 NullReference；确认不是项目脚本编译错误后，显式调用 `InitializeGrid()` 修正。修正后的首次代码又因测试中误用 `ValidateSpatialIndex(out ...)` 签名而编译失败，改为项目实际的无参签名后测试全过。两次均只影响临时 `HideAndDontSave` 测试对象。
+- **静态与编辑器验证**：四个改动脚本均为 0 Error；`EcologyTickDriver` 的标准静态诊断仍提示 2 个性能启发式警告（Update 中 `FindObjectOfType` / 字符串拼接），Unity Console 为 0 Error / 0 Warning；`GameScene` 保持 `isDirty=false`。
+- **边界**：未进入 Play Mode；未修改或保存 Scene；未改 `Assets/Settings`、`ProjectSettings`、`Packages` 或构建配置；未执行 git。
+- **C 类待人工**：Play Mode 中验证：①单只 Crawling 接敌后不再移动或吸放；②同格 2+ Crawling 各自攻击勇者；③勇者每次只伤一个个体并在击杀后换目标；④勇者死亡或脱离后怪物恢复生态；⑤ Bud / Flower 接敌暂停但不反击。
+
+### 2026-08-08 TASK-079 — 魔王摆放阶段冻结模拟、保留当前动画循环
+
+- **目标选择**：采用原版方向，不使用全局硬暂停。魔王重新摆放时冻结怪物数据模拟和视图位置，但继续循环每个怪物暂停瞬间的当前动画状态；合法落位后恢复。
+- **暂停信号**：复用 `DemonLordManager.IsWaitingForPlacement`，不新增第二套流程状态。`EcologyTickDriver.IsSimulationPaused` / `ShouldPauseSimulation` 作为统一查询入口。
+- **模拟层**：`EcologyTickDriver.Update` 在任何 tick / 诊断 / 可见性与区域模拟之前早退；公开 `ProcessSimulationTick` 也带同一守卫，避免其他调用方绕过。暂停期间计时器不累计，因此恢复后不会补算积压 tick。
+- **表现层**：`MonsterViewMover.SetMovementPaused` 冻结根节点坐标插值。`MonsterRenderer.SetSimulationPaused` 捕获 Base Layer 当前或过渡目标状态、normalized time、clip length 与原 Animator speed；状态机速度暂置 0，由表现层逐帧在捕获状态内循环采样。解除暂停时恢复采样位置、原速度与状态机。该机制不依赖具体状态名，可兼容未来进食等新状态。
+- **没有使用**：未改 `Time.timeScale`、AnimatorController、AnimationClip Loop 设置、Prefab 或 Scene，因此魔王放置点击与相机拖动不受影响，也不会把一次性吸收 / 释放动画永久改成循环资源。
+- **A 类验证（未进 Play）**：`RequestReposition` 后暂停被识别；手动调用 `ProcessSimulationTick` 时 tick 与怪物位置均不变；合法 `TryPlaceAt` 后解除暂停，下一次调用只推进 1 tick、怪物从 `(8,10)` 正常移动至 `(9,10)`。表现验证确认位移暂停、Animator speed 受控为 0、同一状态 normalized time 继续循环采样、解除后 speed 恢复为 1；纯循环边界 `0.9 + 0.2 → 0.1` 通过。
+- **工具记录**：修改 `MonsterRenderer.cs` 后 Unity SourceAssetDB 曾报告一次 `Import Error Code:(4)`，详细信息为旧缓存时间戳与磁盘新时间戳不一致；脚本诊断当时已为 0 Error。清空 Console 并执行一次 force AssetDatabase refresh 后缓存同步，错误未复现，最终 Console 0 Error / 0 Warning。
+- **静态检查**：三个改动脚本均为 0 Error；`MonsterViewMover` 0 Warning。`MonsterRenderer` / `EcologyTickDriver` 的标准静态诊断仍各显示 2 条泛化性能启发式（`FindObjectOfType in Update` / `String concatenation in Update`），不属于 Unity 编译或 Console Warning。
+- **边界**：未进入 Play Mode；未修改或保存 Scene；未改 AnimatorController / AnimationClip / Prefab / `Assets/Settings` / `ProjectSettings` / `Packages` / 构建设置；未执行 git。
+- **C 类待人工**：在有 Crawling、吸收 / 释放动作、Bud、Flower 的场面等待倒计时结束：确认进入摆放阶段后所有逻辑位置与生态数值静止，各自当前动画持续循环；摆放完成后无瞬移 / 快进并恢复正常生态。
+
+### 2026-08-08 TASK-080 ~ TASK-083 — 关卡勇者配置、多波调度与魔王掉落
+
+- **确认规则**：①每一波准备倒计时结束后，玩家都能把魔王重新摆到新挖出的 `Empty` 格；②只有上一波全部勇者死亡后才开始下一波倒计时；③携带魔王的勇者死亡时，魔王停留在当前拖拽位置，本波剩余勇者仍可继续争夺，本波全灭则保持到下一波摆放阶段。
+- **配置数据层（TASK-080）**：新增 `HeroArchetypeConfig`（职业 ID / 名称 / HP / 攻击 / 移速 / 攻击距离 / 攻速 / 攻击类型 / Sprite / Animator）、`HeroSpawnEntryConfig`（职业 / 数量 / 首次延迟 / 同类间隔）、`HeroWaveConfig`（波号 / 准备时间 / 出生项）与 `HeroLevelConfig`（关卡号 / 波次数组 / 完整性校验）。`HeroData` 从职业模板复制为独立运行时数据，后续修改模板不会反向污染已生成个体。
+- **资源与生成（TASK-081）**：建立 `Assets/Resources/Hero/Archetypes/hero_warrior.asset` 与 `Assets/Resources/Hero/Levels/hero_level_001.asset`；当前示例为 Level 1、Wave 1、准备 10 秒、1 名 Warrior。`LevelConfig` 优先用 Inspector 引用，其次按 `Hero/Levels/hero_level_###` 加载，最后回退为兼容旧行为的运行时单波配置。`HeroManager` / `HeroRenderer` 已改为按职业模板生成与选取表现资源。
+- **波次调度（TASK-082）**：新增 `HeroWaveDirector`，由 `HeroMover` 在运行时动态挂到现有管理物体，不改 Scene。单波流程为 `Preparation → DemonLord Reposition → Spawn Entries → Wait Until All Heroes Dead`；多个出生项各自按首次延迟并行生成。上一波清空后才进入下一波准备阶段，`MVPGameManager.NotifyHeroDefeated` 不再自行判 Victory，只有全部波次完成且 `HeroManager` 为空时由 Director 调用 `NotifyAllWavesCleared()`。
+- **捕获与掉落（TASK-083）**：`DemonLordManager` 在捕获时记录唯一 `CaptorHeroId` 并随返程步进更新逻辑位置；其他勇者捕获失败时继续追踪，不会误切到返程。携带者战死后 `ReleaseCaptureAt` 在当前拖拽格恢复已放置、未捕获状态，`DemonLordRenderer.DropCaptiveDemonLord` 把跟随视图恢复为普通魔王视图。下一波准备期不移动魔王，倒计时结束调用原 `RequestReposition`，自然复用 TASK-079 的生态冻结。
+- **A 类验证（未进 Play）**：职业/关卡配置快照和两波层级测试通过；`hero_level_001` 可由 Resources 加载且 `IsValid=True`，WaveCount=1、ScheduledHeroes=1；预览 Scene 内完成 `初始已放置 → Hero7 捕获 → Hero8 无法夺取/改位 → Hero7 拖拽位置更新 → 仅 Hero7 可释放 → 原位掉落 → 可进入下一波重摆放`，`DEMON_FLOW=True`；单个勇者死亡后仍为 Playing、全部波次清空后才 Victory，`VICTORY_GATE=True`。
+- **B 类验证（未进 Play）**：全部新增/修改脚本标准诊断 0 Error；最终 Unity Console 0 Error / 0 Warning；新配置资产和 `.meta` 均由 Unity 正常识别；`GameScene` 保持 `isDirty=false`。
+- **工具记录**：新增脚本首次仅刷新旧脚本时，Unity 曾短暂报 `HeroWaveDirector` 未导入；全量 AssetDatabase refresh 后正常导入。随后修正一处短路表达式造成的 C# definite-assignment `CS0165`。域重载期间 MCP 短暂断线并出现一次 `Import Error Code:(4)`，清空 Console、全量刷新并等待 Editor ready 后未复现，最终无编译/导入错误。
+- **边界**：未进入 Play Mode；未修改或保存 Scene；未改 Prefab、Animator、`Assets/Settings`、`ProjectSettings`、`Packages` 或构建设置；未执行 git。
+- **C 类待人工**：Play Mode 配置至少两波进行验证：①Wave 1 全灭后才开始 Wave 2 倒计时；②倒计时期间魔王保持上波位置；③倒计时结束后每波都能重新摆放且生态按 TASK-079 暂停；④携带者死亡后魔王在拖拽位置掉落，其他存活勇者能再次捕获；⑤非最终波全灭不显示 Victory，最终波全灭才显示 Victory；⑥任意携带者到达入口仍立即 Defeat。
+
+### 2026-08-08 TASK-084 — Warrior02 / Mage / Priest 职业模板接入
+
+- **来源与授权**：用户确认 `D:\可能可以用\最终结果\AI_ASSETS\Processed` 已完成外部 AI 处理并审批可用。读取 `_Records/PixelCharacters_20260808_APPROVED.md`：Warrior02、Mage01/02、Priest01/02 各四方向×3帧，共 60 张正式单帧；源图/预览/Sheet 未进入 Unity 项目。
+- **只读审计**：60/60 PNG 均为 48×48、32-bit RGBA，Alpha 仅 `0/255`；每职业 12 张、方向/帧序完整。方向映射 `Down/Up/Left/Right → s/n/w/e`，源 `01/02/03 → 00/01/02`。目标 snake_case 命名 60/60 唯一，与现有 Heroes 资产冲突 0。
+- **分批导入**：遵守“超过 50 文件须分批”，以职业拆为 5 个 12-file 子批；复制时即规范化命名进入平铺 `_Incoming`，由 Unity 生成 `.meta`，应用 Sprite/Single、PPU 48、Point、Uncompressed、no mipmap、alpha transparency、Clamp、NPOT None、Full Rect、Bottom Center，再通过 `AssetDatabase.MoveAsset` 迁入 `Assets/Art/Characters/Heroes/`。最终 `_Incoming` 仅保留 `.gitkeep`。
+- **像素与 GUID 校验**：外部源与正式目标 SHA-256 逐文件比对 60/60 一致；正式目录 60 PNG / 60 Meta。所有 Sprite 导入后仍为 48×48，Pivot=`(24,0)`，本地 Bounds=`x[-0.5,0.5], y[0,1]`，与现有 Hero Root 格中心 + Visual 下移半格规则精确对齐。
+- **动画资产**：每职业建立 `idle/walk × n/s/e/w` 共 8 个循环 Clip（合计 40），8 FPS；idle 直接引用该方向中立帧 `_01`，walk=`00→01→02→01→00`，统一绑定 `Visual/m_Sprite`。每职业建立独立 Resources Controller（合计 5），8 states、default=`idle_s`，与 `HeroRenderer` 状态名完全一致。
+- **职业配置**：新增 `hero_warrior_02`、`hero_mage_01/02`、`hero_priest_01/02` 五个 `HeroArchetypeConfig`；默认 Sprite 均为各自 `walk_s_01`，Controller 独立。外部包没有数值表，故暂复制现有 Warrior 中性占位值（HP30 / ATK3 / Move2 / Range1 / AttackSpeed2 / Normal），不擅自实现法术、治疗或范围攻击；`hero_level_001` 未加入新职业，现有关卡节奏不变。
+- **A/B 验证（未进 Play）**：五个职业全部 `SPRITES=12/12`、`CLIPS=8/8`、Controller 8 states/default idle_s、Archetype Resources 引用与 `HeroData` 默认向下一致，`ALL_PASS=True`；无错误命名、无 PSD/PSB/AI/ASE 源文件、无未引用 Sprite/Clip/Controller 链路。Unity Console 0 Error / 0 Warning，GameScene `isDirty=false`。
+- **工具记录**：首个子批临时 Importer 代码按旧直觉直接访问 `TextureImporter.spriteAlignment/spriteMeshType`，Roslyn 报成员不存在，未执行任何资源写入。随即用 Unity 实时反射确认两项属于 `TextureImporterSettings`，改用 `ReadTextureSettings/SetTextureSettings` 后五批 60/60 配置与移动成功；错误已纳入本记录，不影响最终资产。
+- **边界**：未修改代码、Prefab、现有关卡配置或 Scene；未进入 Play Mode；未保存 Scene；未改 `Assets/Settings`、`ProjectSettings`、`Packages`、构建设置；未执行 git。
+- **C 类待人工**：后续把任一新 Archetype 加入测试波次后，逐职业观察四向行走、停止中立帧、脚底边界与武器/法袍轮廓；尤其复核审批记录中略小的 Mage02 体感。职业数值与专属技能另开设计任务，不与本批美术接入混做。
+
+### 2026-08-08 TASK-085 — 程序化攻击撞击与受击白闪
+
+- **范围**：只实现普通攻击的轻量表现，不新增攻击帧、刀光 / 血花、死亡动画或技能系统。勇者与怪物的索敌、单体锁定、同格群攻、生态占用和伤害数值继续使用 TASK-078 的逻辑。
+- **攻击表现**：新增 `CombatPresentation`。每次攻击只推动攻击者视图的 `Visual` 子节点朝目标移动 0.22 world unit 后返回；Root、Manager 网格坐标和 `MonsterViewMover` 目标都不变。勇者在出手前切换到面向目标的四方向 idle；怪物反击阶段收集所有实际可攻击的 Crawling 视图并同时执行撞击。
+- **结算时机与频率**：伤害回调在撞击到达点触发。默认表现阶段 0.22 秒，并从原攻击间隔的剩余等待中扣除；当前 Warrior `AttackSpeed=2` 时仍保持相邻伤害点约 0.5 秒。高攻速时表现阶段自动压缩到攻击间隔以内。
+- **白闪实现**：新增 `WhatDidIDo/SpriteWhiteFlash` URP Shader 与 `Resources/Combat/mat_sprite_white_flash`。命中时临时把目标的所有 `SpriteRenderer` 切成使用原 Sprite alpha 的纯白剪影，短暂停留后恢复原 `Sprite-Lit-Default`；引用计数保证重叠命中不会提前恢复材质。
+- **并发保护**：同一 `Visual` 同时收到多个撞击请求时只允许一个位移通道，避免不同战斗协程争写局部坐标；受击白闪可重叠。两个勇者同时瞄准同一怪物时，只有实际成功扣血的一方执行后续击杀回流，避免同一个死亡个体重复散布资源。
+- **A 类验证（未进 Play）**：三个脚本标准诊断 0 Error；0.5 秒间隔映射为 0.22 秒表现、0.1 秒间隔压缩为 0.1 秒；东向 / 斜向撞击偏移长度均为 0.22 且 z=0；四向判定正确。单体攻击只伤目标 A 3 HP、目标 B 不变；两个怪物反击计数 2、合计伤害 4，与原逻辑一致。
+- **材质 / Shader 验证（未进 Play）**：Resources 材质加载成功，Shader `isSupported=true`、1 pass、编译消息 0；预览 Scene 中连续开始两次白闪，结束第一段后仍保持白闪，结束第二段后正确恢复 `Universal Render Pipeline/2D/Sprite-Lit-Default`。
+- **B 类验证（未进 Play）**：Hero / Slime Prefab 均存在独立 `Visual` 子节点；Hero `Visual.localPosition.y=-0.5` 保持不变；GameScene 全程 `isDirty=false`，Unity Console 0 Error / 0 Warning。
+- **工具记录**：首次全量 refresh 因脚本域重载返回一次 `Connection closed before reading expected bytes`；MCP 随即恢复，Editor / Scene / Console 只读复核正常，后续编译和验证均通过。
+- **边界**：未进入 Play Mode；未修改或保存 Scene / Prefab；未改 `Assets/Settings`、`ProjectSettings`、`Packages` 或构建设置；未执行 git。
+- **C 类待人工**：Play Mode 检查：①勇者撞击是否足够明显但不越过整格；②怪物群攻是否同时撞击而非排队；③受击白闪亮度和停留时间是否舒适；④连续击杀后角色脚点 / 怪物位置是否恢复；⑤死亡仍按旧清理流程、不出现新增占位动画。
+
+### 2026-08-08 TASK-086 — Demo 主菜单 / 暂停 / 设置 / 结算流程
+
+- **范围选择**：为了完成 Demo 闭环且遵守“不修改 Build Settings”的项目边界，没有新建独立 MainMenu Scene。继续使用唯一 `GameScene`：首次加载显示不透明主菜单并设 `Time.timeScale=0`；Start Game 隐藏菜单并恢复时间。以后拆独立菜单场景时只替换导航层。
+- **流程状态**：新增 `DemoGameFlow`，维护本次运行的 `MainMenu / Gameplay` 入口状态。Start Game 直接进入已暂停初始化完成的当前世界；Restart 标记 Gameplay 后重载；Main Menu 标记 MainMenu 后重载。两种重载都会恢复 `timeScale=1` 并清空 `FloatingResourcePool`，避免上一局静态资源污染。
+- **设置**：主音量直接控制 `AudioListener.volume`；全屏和 1280×720 / 1600×900 / 1920×1080 三档 16:9 分辨率在 Player 构建中调用 `Screen.SetResolution`，Editor 内只保存配置、不干扰 Game View。三项均使用 PlayerPrefs 持久化，并支持 Reset Defaults。
+- **UI 扩展**：将 `MVPResultUI` 扩为统一运行时 Canvas：①主菜单 Start / Settings / Quit；②右上角 Menu；③暂停 Resume / Settings / Restart / Main Menu；④ Victory / Defeat 的 Retry / Settings / Main Menu；⑤可从主菜单、暂停、结算三处进入并返回原上下文的 Settings。运行时自动补 EventSystem + StandaloneInputModule。
+- **输入与暂停**：Gameplay 中 Esc 打开 / 关闭暂停；Settings 中 Esc 返回来源界面；结算后设 `Time.timeScale=0`，既有 R 键重开仍可响应。暂停菜单是全局硬暂停，与 TASK-079 魔王摆放时的怪物专用暂停明确分离。
+- **A 类验证（未进 Play）**：`DemoGameFlow.cs` 0 Error / 0 Warning；设置写入测试通过（Volume=0.42、Fullscreen 翻转、Resolution 循环），Reset 后恢复 Volume=1 / Windowed / 1920×1080；测试结束完整恢复原 PlayerPrefs 与 AudioListener 值。
+- **B 类 UI 结构验证（未进 Play）**：临时 Additive Scene 中生成 1 Canvas、1 EventSystem、15 Buttons、1 Slider。主菜单初始可见且 timeScale=0；Start → Gameplay、Menu → Pause、Pause → Settings → Pause、Resume、Defeat → Settings → Defeat 全部状态切换通过。实际 Button.onClick 与 Slider.onValueChanged 均逐项调用通过；正式 GameScene 始终 `isDirty=false`。
+- **工具记录**：首次仅做 scripts 范围刷新时，新 `DemoGameFlow.cs` 尚未进入 AssetDatabase，旧索引编译导致 `MVPResultUI` 短暂报类型不存在；立即停止后续操作并改用 force/all，全量导入后错误清零。第一次隔离测试尝试把 Preview Scene 设为 Active，Unity 明确拒绝；没有修改正式场景，随后改用未保存的临时 Additive Scene 完成测试并关闭。
+- **视觉边界**：当前仍使用内置 Image / Text / Button / Slider 与英文文案，原因是 `LegacyRuntime.ttf` 不含中日韩字形；正式 UI 图片、中文字体、过渡动效、导航音效和按键重映射不在本次范围。
+- **边界**：未进入 Play Mode；未新增、修改或保存 Scene；未改 Build Settings、ProjectSettings、Packages、Assets/Settings 或构建配置；未执行 git。
+- **C 类待人工**：Play Mode 从首次启动走完整流程：①主菜单背后世界不推进；②Start 后波次 / 生态正常开始；③Menu 与 Esc 暂停 / 恢复；④三种 Settings 入口均返回正确界面；⑤胜负页冻结且 R / Retry 可重开；⑥Main Menu 重载后回到主菜单；⑦16:9 下所有文字与按钮无重叠，确认当前占位配色可接受。
+
+### 2026-08-08 TASK-087 — Unity 包像素特效分类入库
+
+- **范围**：只整理、重命名和规范导入用户已筛选到 `Assets/Art/_Incoming` 的特效；不选择具体技能用途，不接战斗逻辑、Prefab、Scene 或关卡配置。
+- **只读盘点**：共 151 个资产：147 PNG、2 AnimationClip、2 AnimatorController，构成 27 组序列。完整帧审阅后划分为 Projectiles 30、Attacks 66、Blood 9、Explosions 36、Smoke 6；迁移前确认没有 `_Incoming` 外部资产引用这些资源。
+- **正式归档**：通过 Unity AssetDatabase 分六批迁移至 `Assets/Art/FX/{Projectiles,Attacks,Blood,Explosions,Smoke}` 与 `Assets/Animations/FX`。文件按 `fx_<event>_<color>_<frame>` 从 `_00` 连续编号；原供应商编号与正式映射写入 `ART_INTAKE_LOG.md`，不保留供应商目录层级。
+- **Import Settings**：147/147 均为 Sprite/Single、PPU 48、Point、Uncompressed、no mipmap、alpha transparency、Clamp、NPOT None、maxTextureSize 2048、Center Pivot。命名正则检查 147/147 通过。
+- **动画依赖**：保留包内绿色 chevron 与红色 blood burst 的 12 FPS Clip / Controller；规范化文件、主对象和 State 名。两个 Clip 分别保持 6 / 5 个 Sprite key，Controller 依赖全部解析到正式新路径，无 Missing Dependency。原包 Loop 设置未擅自改变，待实际接入时按技能生命周期决定是否改为一次性播放。
+- **GUID / 清理**：六个迁移批次逐项比对 GUID，151/151 保持不变；清理五个已无载荷的原包目录，`Assets/Art/_Incoming` 仅保留占位文件。
+- **Console 记录**：首次读取到一条外部包导入期遗留的 GUID 冲突日志，路径为已不存在的 `Assets/FX/Scenes/SampleScene.unity`，冲突对象是受保护的 `Assets/Settings/Scenes/URP2DSceneTemplate.unity`。只读确认 `Assets/FX` 已不存在后清空旧日志并 Force Refresh，错误未复现；最终 Console 0 Error / 0 Warning。
+- **验证边界**：未进入 Play Mode；未修改代码、Prefab、Scene、关卡、`Assets/Settings`、`ProjectSettings`、`Packages` 或 Build Settings；GameScene 保持 `isDirty=false`；未执行 git。
+- **后续使用方式**：用户指定职业 / 技能 / 命中事件与目标特效名后，再单独建立一次性播放、翻转 / 旋转 / 缩放复用、逻辑判定范围与对象池接入任务。
+
+### 2026-08-09 TASK-088 — 背景音乐分类入库
+
+- **范围**：只整理、重命名并优化导入用户放入 `Assets/Art/_Incoming/Music` 的背景音乐；不创建 AudioSource / AudioManager，不决定主菜单、地下城、战斗或胜负页面具体使用哪一首。
+- **盘点**：共 11 条、总时长约 889.34 秒，全部为 44.1kHz 双声道；7 条文件名明确标注 loop，4 条为完整曲目。其中 Dream On 与 Simple Positive 04 同时保留完整 / 循环版本。迁移前没有任何项目资产引用本批 GUID。
+- **目录与命名**：通过 AssetDatabase 分两批迁移到 `Assets/Audio/Music/Loops`（7）和 `FullTracks`（4）。统一 `bgm_<name>[_loop|_full]`，保留原曲名语义、原文件扩展名和原供应商曲目编号；修正源文件 `lopped` 拼写但不改变音频内容。
+- **Import Settings**：11/11 为 Streaming、Vorbis Quality 0.7、Preserve Sample Rate、Preload Off、Load In Background On、Force To Mono Off、Ambisonic Off。这样避免 52–111 秒音乐全部以 Decompress On Load 方式常驻内存，同时保留立体声；运行时是否循环仍由未来播放逻辑决定。
+- **GUID / 验证**：两批 11/11 迁移前后 GUID 一致；Unity AudioClip 主对象名、路径、44.1kHz / 2 channels、命名正则和 11/11 `.meta` 全部通过；`Assets/Art/_Incoming` 仅保留 `.gitkeep`。
+- **边界**：未进入 Play Mode；未修改代码、Prefab、Scene、AudioSource、关卡、`Assets/Settings`、`ProjectSettings`、`Packages` 或 Build Settings；GameScene 保持 `isDirty=false`；未执行 git。
+- **后续使用方式**：用户指定“界面 / 阶段 / 情境 → 曲目名”后，再建立最小 BGM 播放器、循环 / 一次性策略、淡入淡出与主音量接线任务。
+
+### 2026-08-09 TASK-089 — Buttons UI 子集与英文像素字体入库
+
+- **范围**：只处理外部 `Fun Basic Pixel Art UI for RPG/PSD/Buttons.psd` 及其匹配 PNG 导出；不处理其他 PSD，不修改 `MVPResultUI`，不绑定菜单、Prefab 或 Scene。
+- **PSD 审核**：只读解析到 302 个图层记录、200 个 State 像素层、100 个组分隔符，且无 Photoshop 可编辑文字层。按钮文字为栅格像素；本批只使用空白按钮和通用图标。
+- **按钮与图标**：导入 4 张 42×16 `ui_btn_primary_*` 与 36 张 16×16 `ui_icon_*`。源四态确认是 `normal / hover / pressed / hover_pressed`；最后一态不是 disabled。Sound / Music 的两个变体分别拥有四态，不按变体交错误切。
+- **Import Settings**：40/40 为 Sprite/Single、PPU 48、Point、Uncompressed、no mipmap、alpha transparency、Clamp、NPOT None、Center Pivot；4 张按钮额外写入 4px Sprite Border，供未来 Sliced Image 拉伸。
+- **字体**：不使用包内 `Text1/Text2`。先验证静态位图 Font 会限制多字号后，改为生成原创 5×7 轮廓的动态 TTF `ui_font_demo_pixel`；覆盖英文字母、数字与当前 Demo 所需标点，小写映射为统一的大写像素字形，未专门绘制的冷门符号使用方框占位。Unity 文本生成在 21 / 30 / 92px 与 Bold 下全部通过，Console 0 Error / 0 Warning。
+- **目录与 GUID**：按钮进入 `Assets/Art/UI/Buttons`，图标进入 `Assets/Art/UI/Icons`，字体进入 `Assets/Art/UI/Fonts`；所有 `_Incoming → 正式目录` 迁移与后续状态改名均通过 AssetDatabase，GUID 0 丢失；`_Incoming` 恢复为空。
+- **边界**：未进入 Play Mode；未修改代码、Prefab、Scene、ProjectSettings、Packages、Build Settings 或 `Assets/Settings`；GameScene 保持 `isDirty=false`；未执行 git。
+- **后续使用方式**：等 Main Menu / Settings / Result 等 PSD 分批完成后，再单独修改 `MVPResultUI`，把 Image 切到 Sliced、接入各按钮 SpriteState，并统一引用 `ui_font_demo_pixel`。
+
+### 2026-08-09 TASK-090 — Main Menu UI 子集入库
+
+- **范围**：只处理外部 `Main_menu.psd` 及匹配 PNG 导出，不修改 `MVPResultUI`、Prefab 或 Scene；本批完成后继续 TASK-091，不单独中断交付。
+- **PSD 审核**：只读解析到 57 个图层记录、8 个菜单项分组和 32 个 State 像素层，Photoshop 可编辑文字层为 0。Resume / Restart / Settings / Levels / Inventory / Equipment / Shop / Craft / Quit 均为烘焙像素标签，按既定混合字体方案不导入。
+- **正式资产**：从供应商展开 PNG 中提取 `ui_panel_menu_tall`（80×168）和 `ui_btn_menu_{normal,hover,pressed,hover_pressed}`（56×12）共 5 张。按钮写入 3px Sprite Border；面板保留固定构图和右上角关闭标识，不设九宫格边框。
+- **Import / GUID 验证**：5/5 为 Sprite/Single、PPU 48、Point、Uncompressed、no mipmap、alpha transparency、Clamp、NPOT None、Center Pivot；全部通过 AssetDatabase 从 `_Incoming` 迁入正式目录，迁移前后 GUID 一致。
+- **工具记录**：首次 `execute_code` 在包装方法体内加入 `using` 声明，Roslyn 仅编译失败、未执行任何资源写入；改用全限定类型后导入成功。此限制已记录，后续批次直接使用全限定类型。
+- **边界与验证**：未进入 Play Mode；未修改代码、Prefab、Scene、ProjectSettings、Packages、Build Settings 或 `Assets/Settings`；Unity Console 0 Error / 0 Warning，GameScene 未保存。
+
+### 2026-08-09 TASK-091 — Settings UI 子集入库
+
+- **范围**：只处理外部 `Settings.psd` 及匹配 PNG 导出，不接入当前运行时 Settings 页面，不修改 `MVPResultUI`、Prefab 或 Scene。
+- **PSD 审核**：只读解析到 119 个图层记录、无 Photoshop 可编辑文字层；Settings 标题、Full Screen / Window Mode / Language 与 Save / Decline 文案均为烘焙像素文字，不作为正式文本导入。
+- **正式资产**：提取 `ui_panel_settings`（98×149）、`ui_panel_dropdown_field`（63×13）、`ui_btn_compact_*` 四态（39×13）和 `ui_icon_meter_segment_{active,inactive}`（3×11），合计 8 张。下拉字段和紧凑按钮使用 3px Sprite Border；固定构图面板与音量段不设边框。
+- **去重**：PSD 中的 Home / Play / OpenList / Sound01/02 / Music01/02 / Fullscreen / WindowMode 与 TASK-089 资产一致，直接复用现有正式图标，没有产生重复文件或重复 GUID。
+- **Import / GUID 验证**：8/8 为 Sprite/Single、PPU 48、Point、Uncompressed、no mipmap、alpha transparency、Clamp、NPOT None、Center Pivot；全部通过 AssetDatabase 从 `_Incoming` 迁入正式目录，迁移前后 GUID 一致，`_Incoming` 恢复只含 `.gitkeep`。
+- **边界与验证**：未进入 Play Mode；未修改代码、Prefab、Scene、ProjectSettings、Packages、Build Settings 或 `Assets/Settings`；最终 Unity Console 0 Error / 0 Warning，GameScene 保持 `isDirty=false`，未执行 git。
+- **后续使用方式**：Main Menu 与 Settings 所需的空白底图 / 控件已齐；等其余 Result / Win-Lose 面板分批处理后，可单独把 `MVPResultUI` 替换为正式 Sliced Image + SpriteState + `ui_font_demo_pixel`。
+
+### 2026-08-09 TASK-092 — 现有 UI 资源实装切换
+
+- **范围**：按用户指示停止继续处理其他 PSD，直接用 TASK-089～091 已入库资源替换现有单场景 Demo UI 占位皮肤。保留 `DemoGameFlow`、主菜单 / 暂停 / 设置 / 胜负流程和英文文案，不新增独立 Scene，不接入 BGM、UI 动效或新玩法逻辑。
+- **构建安全主题**：新增 `DemoUITheme` 与 `Assets/Resources/UI/demo_ui_theme.asset`。主题集中引用像素字体、菜单 / 设置 / 下拉面板、Menu / Compact / Primary 三套按钮四态、Play / Home / OpenList / Sound / Fullscreen / WindowMode 图标和音量段；正式美术仍留在 `Assets/Art/UI/**`，运行时代码不使用 `UnityEditor` / `AssetDatabase`。主题完整性同时校验三套按钮的全部四态。
+- **运行时换肤**：`MVPResultUI` 的 Main Menu / Pause / Result 使用 `ui_panel_menu_tall`；Settings 使用 `ui_panel_settings` 与 `ui_panel_dropdown_field`。15 个可见按钮接入 Sliced Image + SpriteSwap，四个面板右上角沿用烘焙关闭标识并叠加透明点击区；25 个运行时 Text 全部使用 `ui_font_demo_pixel`。Canvas 开启 Pixel Perfect，在三档既有 16:9 分辨率下保持整数像素缩放。
+- **设置表现**：主音量改为 16 段激活 / 未激活像素条并保留原 Slider 交互；全屏按钮根据当前配置切换 Fullscreen / WindowMode 图标；分辨率、Reset、Back 使用紧凑按钮，原 PlayerPrefs 和设置行为不变。
+- **A/B 验证（未进 Play）**：脚本编译与标准校验 0 Error；临时未保存 Additive Scene 中运行时生成 19 Buttons（15 个完整 SpriteSwap + 4 个关闭热点）、1 Slider、16 个音量段、25 个像素字体 Text、3 个菜单面板与 1 个设置面板，主题依赖 26 项。Main Menu → Settings → Main Menu、Start → Pause → Settings → Pause → Resume、Victory → Settings → Victory、Return Main Menu 全部通过；测试后临时 Scene 已关闭，GameScene `isDirty=false`。
+- **工具记录**：首次 scripts-only refresh 没有导入新脚本及 `.meta`，改用 force/all 后正常；在类型尚未加载时首次创建主题资产失败且未执行写入。结构验证第一次在执行包装体内加入 `using`，仅 Roslyn 编译失败；第二次把已自动激活的新 Additive Scene 的重复 `SetActiveScene(false)` 误判为失败；第三次测试把 Settings 的叠层设计错误断言为隐藏来源页面。三次都通过 finally 清理或尚未执行对象创建，没有修改正式 Scene；按既有“来源页面保留在设置层下方”的真实逻辑修正断言后全项通过。
+- **边界**：未进入 Play Mode；未修改或保存 Scene / Prefab / `DemoGameFlow`；未改 `Assets/Settings`、`ProjectSettings`、`Packages`、Build Settings；未执行 git。
+- **C 类待人工**：在 16:9 Play Mode 走完整主菜单 / 暂停 / 设置 / 胜负流程，重点观察像素缩放、长文本居中、按钮 hover / pressed 状态、右上角关闭热点、音量段拖动反馈、全屏图标切换与三档分辨率标签。
+
+### 2026-08-09 TASK-092 视觉修正 — 按钮去图标与文字居中
+
+- **人工反馈**：Pause 菜单中只有部分按钮带左侧图标，图标占位让 Resume / Settings / Main Menu 的文字相对 Restart 偏右；现有图标集无法为所有操作建立一致语义，混用后的视觉层级反而更乱。
+- **修正**：`MVPResultUI` 的按钮工厂不再接受或创建 `Icon` 子节点，Main Menu / Pause / Result / Settings / 游戏中 MENU 的全部 15 个可见按钮统一只保留文字。文字 RectTransform 统一拉伸到按钮内部，左右 12px、上下 8px 对称内边距，使用 `MiddleCenter`；因此不再因某些按钮是否有图标而改变排版。Settings 音量标题旁的 `SoundIcon` 属于状态信息，不在按钮内，予以保留。
+- **A/B 验证（未进 Play）**：脚本编译 0 Error，Unity Console 0 Error / 0 Warning。临时未保存 Additive Scene 中确认 19 Buttons、15 个文字按钮、按钮 `Icon` 子节点 0、15/15 文字锚点与对称内边距一致、Sound 状态图标 1；Start Game → Pause 仍通过。测试结束关闭临时 Scene，正式 GameScene 未修改或保存。
+- **工具记录**：首次结构测试在仍处于 MainMenu 模式时直接调用 `PauseGame()`，被既有 `LaunchMode == Gameplay` 守卫正确拒绝；视觉断言此前已全部通过。测试通过 finally 清理，随后按真实流程先 `StartGame()` 再 `PauseGame()`，全项通过。最终静态搜索首次因 PowerShell / `rg` 正则引号转义造成表达式未闭合，未执行写入；改用 `Select-String -SimpleMatch` 后确认按钮图标调用残留为 0。
+- **边界**：未删除或修改图标美术资产；未进入 Play Mode；未修改或保存 Scene / Prefab / `DemoGameFlow`；未改 ProjectSettings、Packages、Build Settings 或 `Assets/Settings`；未执行 git。
+- **C 类待人工**：Play Mode 打开 Main Menu、Pause、Settings 与胜负页，确认所有按钮文字视觉中心一致，特别对比 Resume / Settings / Restart / Main Menu；同时确认 Sound 状态图标仍只出现在音量区而不是按钮内部。
+
+### 2026-08-09 TASK-092 视觉修正 — 正式标题与 Demo 0.1.0
+
+- **人工反馈与判断**：`DUNGEON LORD` 作为一级标题、正式项目名作为小副标题会制造错误品牌层级；前者最多适合作为类型标语，不应让玩家误以为 Demo 改名。当前已经形成最小可试玩闭环，使用 `0.1.0` 标识 Minimum Playable Demo 合理。
+- **主菜单修正**：移除 `DUNGEON LORD` 与旧 `DEMO BUILD / ESC OPENS MENU`。正式标题严格按项目设计名改为两行 `WHAT DID I DO TO / DESERVE THIS, MY LORD`（末尾不加问号），使用 22～32px Best Fit、500×140 标题框和 0.9 行距；底部改为 `MINIMUM PLAYABLE DEMO / VERSION 0.1.0`。
+- **兼容布局**：只把 Main Menu 面板从 480×1008 横向扩至 552×1008，Pause / Result 面板保持原尺寸；按钮尺寸、点击逻辑与关闭热点计算仍沿用现有运行时布局。标题显式换行并启用 Best Fit，避免不同 16:9 分辨率下单行溢出。
+- **A/B 验证（未进 Play）**：脚本编译 0 Error，Unity Console 0 Error / 0 Warning。临时未保存 Additive Scene 中确认 Main Menu 面板 552×1008、标题准确两行、标题框 500×140、首选宽高均未越界、版本 footer 完整、旧 `DUNGEON LORD` 不存在、按钮图标仍为 0；测试后临时 Scene 已关闭。
+- **边界**：未修改正式 UI 图片、Pause / Settings / Result 流程、Scene / Prefab / `DemoGameFlow`；未进入 Play Mode；未保存 Scene；未改 ProjectSettings、Packages、Build Settings 或 `Assets/Settings`；未执行 git。
+- **C 类待人工**：在 16:9 Play Mode 检查正式标题的两行字重、行距和留白，确认横向放大的边框没有不可接受的像素拉伸，并复核 `VERSION 0.1.0` 在底部清晰可读。
+
+### 2026-08-09 TASK-093 — Demo 阶段 BGM 调度
+
+- **阶段边界**：`HeroWaveDirector` 新增显式 `HeroWavePhase`。`Preparing` 与 `WaitingForDemonLordPlacement` 统一映射为非入侵音乐；`Invading` 从魔王合法落位后、本波出生延迟开始前生效，持续经过出生间隔与场上勇者清空等待，直到最后一名勇者死亡。这样不会因出生延迟期间暂时没有勇者而误切回自由音乐。
+- **曲目配置**：新增构建安全的 `DemoBgmLibrary` 与 `Assets/Resources/Audio/demo_bgm_library.asset`。主菜单=`bgm_magical_major_theme_07`；自由阶段池=`bgm_dream_on_loop / bgm_simple_positive_01_loop / bgm_simple_positive_04_loop`；入侵=`bgm_magic_within_loop`。每次从入侵重新进入自由阶段都会重新调用随机抽取，允许纯随机结果偶然重复同一首。
+- **运行时调度**：新增 `DemoBgmDirector`，由 `MVPResultUI.InitializeUI()` 运行时挂载，不修改 Scene。单一 2D AudioSource 持续循环当前曲；主音量继续由既有 `AudioListener.volume` 控制。Victory / Defeat 暂时停止 BGM，等待后续专属资源。
+- **暂停例外**：只把 `MVPResultUI.IsPauseMenuVisible` 视为音乐暂停信号，调用 AudioSource Pause / UnPause，保留曲目与时间位置并暂停阶段求值；Pause 上方的 Settings 仍保持暂停。主菜单虽 `Time.timeScale=0`，仍播放主菜单曲。
+- **A/B 验证（未进 Play）**：逐脚本编译均为 0 Error / 0 Warning；临时未保存 Additive Scene 中验证 Main Menu→Free Digging→Invasion→Inter-wave Free Digging→Pause→Pause Settings→Resume→Victory Silent 全链路，配置 5 条引用完整，暂停前后选中曲不变；临时 Scene 关闭后正式 GameScene 未修改或保存。
+- **工具记录**：交付前尝试用 `batch_execute` 并行调用 `validate_script`，服务器返回该命令不受 batch 支持，未执行任何项目写入；随后改为逐脚本直接校验。将波次查找优化为静态 Active 引用后的第一次 Edit Mode 测试误以为普通 MonoBehaviour 的 `Awake` 会在非 Play 状态自动调用，因此测试在进入阶段断言前主动失败；修正测试夹具为显式注入 Active 后全链路通过，运行时仍由 `Awake / OnDestroy` 正常注册与释放。
+- **边界**：未进入 Play Mode；未修改或保存 Scene / Prefab / `Assets/Settings` / ProjectSettings / Packages / Build Settings；未加入淡入淡出、AudioMixer、UI 音效或胜负专属音乐；未执行 git。
+- **C 类待人工**：Play Mode 实听主菜单循环、Start 后三首自由曲随机抽一、入侵开始切换、全灭进入下一波倒计时重新抽取，以及 Esc / Pause Settings / Resume 是否从同一时间点无缝继续。
+
+### 2026-08-09 TASK-094 — 波次勇者独立槽位配置
+
+- **设计修正**：Demo 单波通常不超过 4 名高数值勇者，原 `HeroSpawnEntryConfig` 的“职业 + Count + FirstSpawnDelay + SpawnInterval”批量模型会让 `1×Warrior + 1×Warrior02` 这类队伍配置显得绕。改为 `HeroWaveConfig.Heroes` 独立槽位列表，每行就是一个确切勇者，只保留职业引用和相对本波入侵开始的 `SpawnDelay`。
+- **代码迁移**：`HeroLevelConfig` 删除序列化 `count / firstSpawnDelay / spawnInterval`，并用 `FormerlySerializedAs` 迁移旧 `entries / firstSpawnDelay` 数据；校验按逐槽位职业非空执行。`HeroWaveDirector` 每个槽位启动一个独立延迟协程且只生成一次，`CountScheduledHeroes` 改为统计有效槽位。运行时默认回退仍为 1 波 / 1 名默认 Warrior。
+- **Level 1 配置**：`hero_level_001` 现为 2 波，每波准备 10 秒。Wave 1=`warrior@0s`；Wave 2=`warrior@0s + warrior_02@0s`。若后续需要错峰，只需修改各行 `SpawnDelay`，无需恢复 Count 或同类间隔。
+- **A/B 验证（未进 Play）**：Resources 关卡加载与 `IsValid` 通过；WaveCount=2、人数=1/2、职业顺序精确为 `[warrior] / [warrior, warrior_02]`；序列化数组尺寸=1/2，旧三个批量字段均不存在；运行时默认回退有效，空职业槽位被正确拒绝。两个改动脚本标准校验均为 0 Error / 0 Warning，Unity Console 0 Error / 0 Warning。
+- **工具记录**：最终只读复核代码首次把 `out string error` 放在短路表达式中，Roslyn 在后续匿名对象访问时判定可能未赋值并拒绝编译；代码没有执行、没有产生资源写入。将 `error` 预先初始化后复核通过。
+- **边界**：未进入 Play Mode；未修改或保存 Scene / Prefab / 职业数值 / 战斗 / BGM / ProjectSettings / Packages / Build Settings / `Assets/Settings`；未执行 git。
+- **C 类待人工**：Play Mode 确认 Wave 1 全灭后才开始 Wave 2 的 10 秒准备；第二次摆放魔王后 Warrior 与 Warrior 02 同波生成、使用各自四向美术并同时参与战斗；最终两人全灭才触发 Victory。
+
+### 2026-08-09 TASK-095 — 后导入勇者东西方向美术纠正
+
+- **问题定位**：人工实机确认 `hero_warrior_02` 的 `e/w` 表现相反，并指出除首套 `hero_warrior` 外其余后导入职业均有同类问题。静态像素抽查确认 `warrior_02`、`mage_01/02`、`priest_01/02` 的 `e` 实际朝左、`w` 实际朝右；首套 Warrior 的 `e=右 / w=左` 正确。
+- **引用链审计**：修复前检查五套职业的 20 个横向 idle/walk Clip、70 个 Sprite 关键帧与 20 个 AnimatorController 状态，全部已按方向同名引用（`*_e` Clip 引用 `*_walk_e_*`，`*_w` 同理），没有 Controller 或状态映射错误。根因仅为 PNG 像素内容归入了相反文件名。
+- **最小修复**：逐帧交换五套职业 15 对 `walk_e / walk_w` PNG 像素载荷，共 30 张；文件路径、文件名、`.meta` 与 GUID 保持不变。这样 Clip 的现有 GUID 引用自动显示正确方向，无需重写 20 个 Clip 或 5 个 Controller，也不影响各职业的 `walk_s_01` 默认形态。首套 `hero_warrior` 未参与处理。
+- **A/B 验证（未进 Play）**：30/30 Sprite 仍为 Sprite/Single、PPU 48、Point、Uncompressed、no mipmap、Clamp、Bottom Center；20 个 Clip / 70 个关键帧仍全部引用正确方向路径，20 个 Controller 状态仍绑定正确 Clip；五个职业默认 Sprite 仍为各自 `walk_s_01`。五套中立横向帧视觉复核为 `e=右 / w=左`。GameScene `isDirty=false`，Unity Console 最终 0 Error / 0 Warning。
+- **边界**：未修改脚本、AnimationClip、AnimatorController、职业属性、Prefab 或 Scene；未进入 Play Mode；未保存 Scene；未改 `Assets/Settings`、ProjectSettings、Packages 或 Build Settings；未执行 git。
+- **C 类待人工**：Play Mode 让五个后导入职业分别向左 / 右移动，确认行走与停下 idle 均朝逻辑方向；重点复核 Wave 2 的 Warrior 02 横向寻路。若任一职业仍反向，记录职业名、移动方向与当时 Animator state 后停止验收。

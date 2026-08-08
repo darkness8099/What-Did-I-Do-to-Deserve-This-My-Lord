@@ -62,8 +62,30 @@ public class DemonLordManager : MonoBehaviour
         if (IsCaptured) return false;
 
         IsCaptured = true;
+        IsPlaced = false;
+        IsRepositioning = false;
         CaptorHeroId = heroId;
         Debug.Log($"[DemonLordManager] DemonLord captured by Hero {heroId}.");
+        return true;
+    }
+
+    public bool UpdateCapturedPosition(int heroId, Vector2Int newPosition)
+    {
+        if (!IsCaptured || CaptorHeroId != heroId) return false;
+        position = newPosition;
+        return true;
+    }
+
+    public bool ReleaseCaptureAt(int heroId, Vector2Int dropPosition)
+    {
+        if (!IsCaptured || CaptorHeroId != heroId) return false;
+
+        position = dropPosition;
+        IsCaptured = false;
+        IsPlaced = true;
+        IsRepositioning = false;
+        CaptorHeroId = -1;
+        Debug.Log($"[DemonLordManager] DemonLord dropped at ({position.x},{position.y}) after Hero {heroId} was defeated.");
         return true;
     }
 }
