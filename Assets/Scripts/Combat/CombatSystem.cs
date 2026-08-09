@@ -12,6 +12,8 @@ public class CombatSystem : MonoBehaviour
     private MonsterRenderer monsterRenderer;
     private GridManager     gridManager;
     private EcologyTickDriver ecologyTickDriver;
+    private HeroProjectileSystem projectileSystem;
+    private CombatHitEffectSystem hitEffectSystem;
     private readonly List<GameObject> heroAttackViews = new List<GameObject>(1);
     private readonly List<GameObject> monsterAttackViews = new List<GameObject>();
 
@@ -30,6 +32,14 @@ public class CombatSystem : MonoBehaviour
         if (monsterRenderer == null) Debug.LogError("[CombatSystem] MonsterRenderer not found.");
         if (gridManager     == null) Debug.LogError("[CombatSystem] GridManager not found.");
 
+        projectileSystem = GetComponent<HeroProjectileSystem>();
+        if (projectileSystem == null) projectileSystem = gameObject.AddComponent<HeroProjectileSystem>();
+        projectileSystem.Initialize(gridManager, monsterManager, this);
+
+        hitEffectSystem = GetComponent<CombatHitEffectSystem>();
+        if (hitEffectSystem == null) hitEffectSystem = gameObject.AddComponent<CombatHitEffectSystem>();
+        hitEffectSystem.Initialize();
+
         Debug.Log("[CombatSystem] Initialized.");
     }
 
@@ -43,6 +53,91 @@ public class CombatSystem : MonoBehaviour
             ? monsterManager.GetMonster(gridPos.x, gridPos.y)
             : null;
         yield return ResolveCombat(heroId, target, result);
+    }
+
+    public MonsterData FindRangedTarget(Vector2Int origin, Vector2Int direction, float range)
+    {
+        return projectileSystem != null
+            ? projectileSystem.FindTarget(origin, direction, range)
+            : null;
+    }
+
+    public IEnumerator ResolveRangedCombat(int heroId, CombatResult result)
+    {
+        if (result == null) yield break;
+        result.HeroSurvived = true;
+        if (heroManager == null || monsterManager == null || !heroManager.HasHero(heroId))
+        {
+            result.HeroSurvived = false;
+            yield break;
+        }
+
+        HeroData hero = heroManager.GetHero(heroId);
+        float interval = hero.AttackSpeed > 0f ? 1f / hero.AttackSpeed : 0.5f;
+        var attackers = new List<MonsterData>();
+        var attackerViews = new List<GameObject>();
+
+        while (hero.IsAlive() && heroManager.HasHero(heroId))
+        {
+            Vector2Int heroPos = heroManager.GetHeroPosition(heroId);
+            if (ecologyTickDriver != null)
+                ecologyTickDriver.EnsureExactAround(heroPos, Mathf.CeilToInt(hero.AttackRange));
+
+            MonsterData target = FindRangedTarget(heroPos, hero.FacingDirection, hero.AttackRange);
+            if (target == null) yield break;
+            if (heroRenderer != null)
+                heroRenderer.SetHeroMotion(heroId, hero.FacingDirection, false);
+
+            float presentationDuration = CombatPresentation.GetPhaseDuration(interval);
+            GameObject heroView = heroRenderer != null ? heroRenderer.GetHeroView(heroId) : null;
+            Vector2Int castOrigin = heroPos;
+            Vector2Int castDirection = hero.FacingDirection;
+            int damage = hero.Attack;
+            bool launched = false;
+            yield return CombatPresentation.PlayDirectionalCast(
+                heroView,
+                castDirection,
+                presentationDuration,
+                () => launched = projectileSystem.Launch(castOrigin, castDirection, damage));
+            if (!launched) yield break;
+
+            float waitAfterPresentation = interval - presentationDuration;
+            if (waitAfterPresentation > 0f)
+                yield return new WaitForSeconds(waitAfterPresentation);
+
+            if (!heroManager.HasHero(heroId)) yield break;
+            heroPos = heroManager.GetHeroPosition(heroId);
+            monsterManager.CollectCombatAttackers(heroPos, attackers);
+            if (attackers.Count == 0) continue;
+
+            attackerViews.Clear();
+            for (int i = 0; i < attackers.Count; i++)
+            {
+                GameObject view = monsterRenderer != null ? monsterRenderer.GetMonsterView(attackers[i]) : null;
+                if (view != null && CanMonsterAttack(attackers[i])) attackerViews.Add(view);
+            }
+            heroView = heroRenderer != null ? heroRenderer.GetHeroView(heroId) : null;
+            yield return CombatPresentation.PlayAttack(
+                attackerViews,
+                heroView,
+                presentationDuration,
+                () =>
+                {
+                    int attackCount = ApplyMonsterAttackPhase(hero, attackers);
+                    if (attackCount > 0 && hitEffectSystem != null)
+                        hitEffectSystem.PlayHeroBlood(heroView);
+                });
+
+            if (!hero.IsAlive())
+            {
+                heroManager.RemoveHero(heroId);
+                if (heroRenderer != null) heroRenderer.RemoveHeroView(heroId);
+                result.HeroSurvived = false;
+                yield break;
+            }
+            if (waitAfterPresentation > 0f)
+                yield return new WaitForSeconds(waitAfterPresentation);
+        }
     }
 
     public IEnumerator ResolveCombat(int heroId, MonsterData initialTarget, CombatResult result)
@@ -94,7 +189,12 @@ public class CombatSystem : MonoBehaviour
                 heroAttackViews,
                 targetView,
                 presentationDuration,
-                () => heroAttackApplied = ApplySingleTargetHeroAttack(hero, target));
+                () =>
+                {
+                    heroAttackApplied = ApplySingleTargetHeroAttack(hero, target);
+                    if (heroAttackApplied && hitEffectSystem != null)
+                        hitEffectSystem.PlayMonsterImpact(targetView, attackDirection);
+                });
 
             // Another hero may have defeated this same instance while both attack visuals were running.
             if (!heroAttackApplied)
@@ -106,15 +206,8 @@ public class CombatSystem : MonoBehaviour
 
             if (!target.IsAlive())
             {
-                ResourceFlow.ScatterOrdinaryDeathResources(
-                    target.Position,
-                    target,
-                    gridManager,
-                    DeathCause.HeroKill,
-                    target.DisplayName);
-                if (monsterRenderer != null) monsterRenderer.NotifyMonsterDied(target);
+                HandleMonsterDefeat(target);
                 Debug.Log($"[CombatSystem] {target.DisplayName} defeated at {target.Position}. Hero HP: {hero.CurrentHP}");
-                monsterManager.Remove(target);
                 target = monsterManager.FindNearestMonsterTargetInRange(heroPos, hero.AttackRange);
                 if (target == null) yield break;
             }
@@ -143,7 +236,12 @@ public class CombatSystem : MonoBehaviour
                 monsterAttackViews,
                 heroView,
                 presentationDuration,
-                () => ApplyMonsterAttackPhase(hero, attackers));
+                () =>
+                {
+                    int attackCount = ApplyMonsterAttackPhase(hero, attackers);
+                    if (attackCount > 0 && hitEffectSystem != null)
+                        hitEffectSystem.PlayHeroBlood(heroView);
+                });
 
             if (!hero.IsAlive())
             {
@@ -157,6 +255,36 @@ public class CombatSystem : MonoBehaviour
             if (waitAfterPresentation > 0f)
                 yield return new WaitForSeconds(waitAfterPresentation);
         }
+    }
+
+    public bool ApplyRangedProjectileHit(int damage, MonsterData target)
+    {
+        return ApplyRangedProjectileHit(damage, target, Vector2Int.right);
+    }
+
+    public bool ApplyRangedProjectileHit(int damage, MonsterData target, Vector2Int impactDirection)
+    {
+        if (target == null || !target.IsAlive() || monsterManager == null
+            || !monsterManager.Contains(target)) return false;
+
+        GameObject targetView = monsterRenderer != null ? monsterRenderer.GetMonsterView(target) : null;
+        target.TakeDamage(Mathf.Max(0, damage));
+        if (hitEffectSystem != null)
+            hitEffectSystem.PlayMonsterImpact(targetView, impactDirection);
+        if (!target.IsAlive()) HandleMonsterDefeat(target);
+        return true;
+    }
+
+    private void HandleMonsterDefeat(MonsterData target)
+    {
+        ResourceFlow.ScatterOrdinaryDeathResources(
+            target.Position,
+            target,
+            gridManager,
+            DeathCause.HeroKill,
+            target.DisplayName);
+        if (monsterRenderer != null) monsterRenderer.NotifyMonsterDied(target);
+        monsterManager.Remove(target);
     }
 
     public static bool ApplySingleTargetHeroAttack(HeroData hero, MonsterData target)

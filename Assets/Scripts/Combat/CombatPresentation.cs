@@ -50,6 +50,48 @@ public static class CombatPresentation
         return delta.normalized * Mathf.Max(0f, distance);
     }
 
+    public static IEnumerator PlayDirectionalCast(
+        GameObject attackerView,
+        Vector2Int direction,
+        float phaseDuration,
+        Action onRelease)
+    {
+        float duration = Mathf.Max(0.01f, phaseDuration);
+        float forwardSeconds = duration * ForwardRatio;
+        float holdSeconds = duration * FlashHoldRatio;
+        float returnSeconds = duration - forwardSeconds - holdSeconds;
+        var lunges = new List<LungeState>();
+
+        Transform visual = ResolveVisual(attackerView);
+        if (visual != null && visual != attackerView.transform && !activeLungeVisuals.Contains(visual))
+        {
+            Vector3 worldOffset = new Vector3(direction.x, direction.y, 0f).normalized
+                * DefaultLungeDistance;
+            Vector3 localOffset = visual.parent != null
+                ? visual.parent.InverseTransformVector(worldOffset)
+                : worldOffset;
+            activeLungeVisuals.Add(visual);
+            lunges.Add(new LungeState
+            {
+                Visual = visual,
+                BaseLocalPosition = visual.localPosition,
+                LungeLocalOffset = localOffset,
+            });
+        }
+
+        try
+        {
+            yield return TweenLunges(lunges, 0f, 1f, forwardSeconds);
+            onRelease?.Invoke();
+            yield return new WaitForSeconds(holdSeconds);
+            yield return TweenLunges(lunges, 1f, 0f, returnSeconds);
+        }
+        finally
+        {
+            RestoreLunges(lunges);
+        }
+    }
+
     public static IEnumerator PlayAttack(
         IList<GameObject> attackerViews,
         GameObject targetView,

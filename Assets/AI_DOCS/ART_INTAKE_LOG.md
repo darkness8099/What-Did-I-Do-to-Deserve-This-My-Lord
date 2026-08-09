@@ -131,3 +131,18 @@
 | Date | Batch | Count | Category | Result | Operator |
 |---|---|---:|---|---|---|
 | 2026-08-09 | fun_basic_pixel_ui_settings_v1 | 8 | UI / Panels / Buttons / Icons | OK - Extracted the blank Settings panel, stretchable dropdown field, compact four-state button family, and active / inactive meter segments. Reused the matching common icons already archived by TASK-089 instead of importing duplicates. | AI 协助 |
+
+## 2026-08-09 tile_break_dirt_chip_pack_v1
+
+| Date | Batch | Count | Category | Result | Operator |
+|---|---|---:|---|---|---|
+| 2026-08-09 | tile_break_dirt_chip_pack_v1 | 4 | FX / Tile Break | OK - Imported four approved 32×32 dirt-chip variants as `fx_tile_break_dirt_chip_01..04`; Sprite/Single, PPU 48, Point, Uncompressed, no mipmap, Clamp, centered pivot. Added matching URP 2D Sprite-Unlit materials and linked all four variants into `Resources/FX/PF_TileBreak_DirtChip`; `_Incoming` returned to `.gitkeep` only. | AI 协助 |
+
+## 2026-08-09 spell_projectile_sprites_v1
+
+| Date | Batch | Count | Category | Result | Operator |
+|---|---|---:|---|---|---|
+| 2026-08-09 | spell_projectile_sprites_v1 - Sprite Sheet | 1 sheet / 224 slices | FX / Projectiles | OK - Imported the approved 256×896 Aseprite export as `fx_spell_projectiles_sheet`; Sprite/Multiple, 224 untrimmed 32×32 centered slices, PPU 48, Point, Uncompressed, no mipmap, Clamp. Source JSON was used only to verify coordinates and 100 ms durations and was not copied into `Assets`. | AI 协助 |
+| 2026-08-09 | spell_projectile_sprites_v1 - Animation Clips | 28 | Animations / FX | OK - Added seven elements × four visual variants as 10 FPS, eight-frame looping `anim_fx_projectile_<element>_<variant>` clips under `Animations/FX/SpellProjectiles`; no Controller, Prefab or gameplay binding was created. | AI 协助 |
+| 2026-08-09 | spell_projectile_sprites_v1 - Fireball 01 Integration | 2 | Animations / FX / Prefab | OK - Selected `anim_fx_projectile_fireball_01`; added its single-state Controller and build-safe `Resources/FX/PF_Hero_Fireball` with Sprite-Lit-Default, original 0.67-cell scale and four-direction root rotation supplied by the existing projectile system. | AI 协助 |
+| 2026-08-09 | spell_projectile_sprites_v1 - Fireball Readability Revision | 1 revised | FX / Prefab | OK - Kept the source sheet at PPU 48 and changed only `PF_Hero_Fireball` scale to 1.5, producing an approximately 1×1-cell visual without altering grid collision or damage logic. | AI 协助 |

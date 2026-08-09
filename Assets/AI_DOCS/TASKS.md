@@ -210,7 +210,7 @@
 
 - `TASKS.md` 以“当前真实任务状态”为准。
 - `AI_WORKFLOW_LOG.md` 中旧的“后续建议任务”如果与后续正式编号冲突，应视为历史建议，不再作为编号依据。
-- 当前最新已落档任务为 `TASK-095`。阶段 11 的范围冻结只约束当时的 Closeout；2026-08-08 起用户在换机后明确重启增量资源与玩法实装。
+- 当前最新已落档任务为 `TASK-101`。阶段 11 的范围冻结只约束当时的 Closeout；2026-08-08 起用户在换机后明确重启增量资源与玩法实装。
 - 阶段 10 完成情况：061→068（Grid 数据/邻格 → 规则移动 → 移动后生态检测 → HP/出生/死亡分流 → Bud → Flower → 阶段渲染 → tick 驱动+场景接线）；TASK-069 移动动画为视觉层先行。（阶段 10 已完成 061→068：Grid 数据/邻格 → 规则移动 → 移动后生态检测 → HP/出生/死亡分流 → Bud → Flower → 阶段渲染 → tick 驱动+场景接线；TASK-069 移动动画为视觉层先行。整条匍匐苔藓生命周期已可进 Play Mode 试玩）
 
 ---
@@ -304,3 +304,40 @@
 ## 阶段 24：后导入勇者横向美术纠正
 
 - [x] **TASK-095** — 修正 `warrior_02`、`mage_01/02`、`priest_01/02` 五套职业模板的东西方向误标：逐帧交换 15 对 `walk_e / walk_w` PNG 像素内容（共 30 张），保持规范文件名、`.meta` 与 GUID 不变；首套方向正确的 `hero_warrior` 不动。20 个横向 idle/walk Clip、70 个 Sprite 关键帧及 20 个 Controller 状态原本已按方向同名引用，因此无需改动画资产，换图后引用自动得到正确画面。未进入 Play Mode，未修改或保存 Scene。
+
+---
+
+## 阶段 25：挖掘点击视觉反馈
+
+- [x] **TASK-096** — 接入土块破坏碎片效果：从外部审批目录导入 4 张 32×32 `dirt_chip` 为 `fx_tile_break_dirt_chip_01..04`，统一 Sprite/Single、PPU 48、Point、Uncompressed、no mipmap、Clamp、中心枢轴；创建 `PF_TileBreak_DirtChip` 世界空间粒子预制体与 `TileBreakEffect` 随机发射器。每次 `DigCell` 成功后在格子中心发射 4～6 个随机碎片，带随机旋转、轻微重力、尾部淡出与缩小；非法点击或挖掘失败不生成效果。未进入 Play Mode，未修改或保存 Scene。
+  - 2026-08-09 扩散范围修订：速度由 0.6～1.5 提高为 2.2～3.0，寿命由 0.20～0.35 调为 0.28～0.40 秒，自动清理延后至 0.55 秒；理论径向位移约 0.62～1.20 格，使碎片越过当前 1×1 格但不抵达完整 3×3 区域外缘。
+
+---
+
+## 阶段 26：法师远程战斗逻辑
+
+- [x] **TASK-097** — 为 `mage_01 / mage_02` 建立无正式特效的远程战斗底层：两职业改为 `Ranged`、直线索敌距离 8 格，按当前寻路面向沿可通行通道检查，墙壁会阻断索敌。索敌成功后原地待机，按既有 `AttackSpeed` 做面向方向短距离前顶 / 返回并释放逻辑火球；火球以 8 格/秒沿格子前进，命中首个存活魔物后结算单体伤害，撞 Soil / 边界消失。火球不绑定最初目标，因此目标提前死亡后，已在途火球继续前进并可命中后续同路线魔物。暂未提供 `PF_Hero_Fireball` 正式视觉 Prefab；按用户要求不进入 Play Mode、不执行玩法或视觉测试，仅完成逐步编译和 Console 检查。
+
+---
+
+## 阶段 27：法术投射物素材池接入
+
+- [x] **TASK-098** — 解析 Aseprite 导出的 `Spell Projectiles Sprite Sheet.png + JSON`：JSON 仅作为 224 个 32×32 帧的坐标 / 时长元数据，不进入运行时。整图规范为 `fx_spell_projectiles_sheet.png` 并以 Sprite/Multiple 导入 `Art/FX/Projectiles/`，切出 Fireball / Ice / Earth / Nature / Air / Arcane / Lightning 七类 × 四变体 × 八帧，子 Sprite 命名为 `fx_projectile_<element>_<variant>_<frame>`；生成 28 个 10 FPS 循环 Clip 到 `Animations/FX/SpellProjectiles/`。本轮只建立完整可复用素材池，不创建 Controller / Prefab，不绑定 `PF_Hero_Fireball`，不进入 Play Mode、不修改或保存 Scene。
+
+---
+
+## 阶段 28：法师火球正式视觉绑定
+
+- [x] **TASK-099** — 选定 `anim_fx_projectile_fireball_01` 作为当前法师火球表现，创建 `Resources/FX/anim_fx_projectile_fireball_01_ctrl` 与 `Resources/FX/PF_Hero_Fireball`。Prefab 使用首帧 `fx_projectile_fireball_01_00`、Sprite-Lit-Default、原比例约 0.67×0.67 格、Sorting Order 4；既有 `HeroProjectileSystem` 已按施法瞬间的四向面向旋转火球根节点，右 / 上 / 左 / 下分别为 0° / 90° / 180° / -90°，动画只替换根节点 Sprite，不会覆盖方向。未修改脚本、未进入 Play Mode、未修改或保存 Scene。
+
+---
+
+## 阶段 29：法师火球可读性与脱手飞行调参
+
+- [x] **TASK-100** — 修正 Fireball 01 实机偏小 / 偏快：保持图集 PPU 48 不变，将 `PF_Hero_Fireball` 根缩放设为 1.5，使 32px 原帧由约 0.67×0.67 格放大到准确约 1×1 格；`HeroProjectileSystem.projectileSpeed` 从 8 降为 4 格/秒。释放频率继续只由职业 `AttackSpeed` 决定，与飞行速度完全解耦；每次 Launch 都创建独立 Shot，法师无需等待上一枚命中即可继续施放。当前 Mage 攻速 2 次/秒，8 格距离飞行约 2 秒，目标持续存活时理论约 4 枚火球可同时在途。未改伤害、索敌、方向、撞墙或命中规则，未进入 Play Mode、未修改或保存 Scene。
+
+---
+
+## 阶段 30：战斗受击特效强化
+
+- [x] **TASK-101** — 复用已审批 FX 素材建立两套短促受击表现：勇者实际受到怪物伤害时播放 4 帧 `fx_blood_arc_red` 流血动画，每次从四个正交方向随机旋转；同一群攻结算阶段只生成一份血弧，避免怪物数量直接造成特效堆叠。魔物被勇者近战或法师火球实际命中时播放 4 帧 `fx_attack_impact_white` 冲击动画；源图默认朝右，按攻击力方向旋转，使“攻击者位于左侧”对应 0°，上 / 右 / 下来源依次映射到 -90° / 180° / 90°。两套动画均为 12 FPS、非循环、Sprite-Lit-Default，并在 0.4 秒后自动销毁；勇者血弧经实机修订为 Scale 1.5 / Order 22，使其约占 1.28×1.0 格并明确绘制在 Order 20 的勇者前方；魔物冲击为 Scale 1.5 / Order 12，约占 0.69×1.0 格并绘制在 Order 10 的魔物前方。保留既有受击白闪，不改伤害、攻击频率、投射物规则或死亡分流。未进入 Play Mode、未修改或保存 Scene。

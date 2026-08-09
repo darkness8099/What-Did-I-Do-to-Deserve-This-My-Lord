@@ -121,12 +121,18 @@ public class HeroMover : MonoBehaviour
             if (ecologyTickDriver != null)
                 ecologyTickDriver.EnsureExactAround(currentPos, Mathf.CeilToInt(heroData.AttackRange));
 
-            MonsterData target = monsterManager.FindNearestMonsterTargetInRange(currentPos, heroData.AttackRange);
+            bool usesProjectile = heroData.AttackType == HeroAttackType.Ranged;
+            MonsterData target = usesProjectile
+                ? combatSystem.FindRangedTarget(currentPos, heroData.FacingDirection, heroData.AttackRange)
+                : monsterManager.FindNearestMonsterTargetInRange(currentPos, heroData.AttackRange);
             if (target != null)
             {
                 heroRenderer.SetHeroMotion(heroId, heroData.FacingDirection, false);
                 var combatResult = new CombatResult();
-                yield return StartCoroutine(combatSystem.ResolveCombat(heroId, target, combatResult));
+                if (usesProjectile)
+                    yield return StartCoroutine(combatSystem.ResolveRangedCombat(heroId, combatResult));
+                else
+                    yield return StartCoroutine(combatSystem.ResolveCombat(heroId, target, combatResult));
                 if (!combatResult.HeroSurvived)
                 {
                     DropDemonLordIfCaptor(heroId);

@@ -3904,3 +3904,86 @@ GridData → GridManager → GridRenderer → InputHandler（挖掘）
 - **A/B 验证（未进 Play）**：30/30 Sprite 仍为 Sprite/Single、PPU 48、Point、Uncompressed、no mipmap、Clamp、Bottom Center；20 个 Clip / 70 个关键帧仍全部引用正确方向路径，20 个 Controller 状态仍绑定正确 Clip；五个职业默认 Sprite 仍为各自 `walk_s_01`。五套中立横向帧视觉复核为 `e=右 / w=左`。GameScene `isDirty=false`，Unity Console 最终 0 Error / 0 Warning。
 - **边界**：未修改脚本、AnimationClip、AnimatorController、职业属性、Prefab 或 Scene；未进入 Play Mode；未保存 Scene；未改 `Assets/Settings`、ProjectSettings、Packages 或 Build Settings；未执行 git。
 - **C 类待人工**：Play Mode 让五个后导入职业分别向左 / 右移动，确认行走与停下 idle 均朝逻辑方向；重点复核 Wave 2 的 Warrior 02 横向寻路。若任一职业仍反向，记录职业名、移动方向与当时 Animator state 后停止验收。
+
+### 2026-08-09 TASK-096 — 土块破坏碎片点击反馈
+
+- **范围与入库**：只处理外部 `tile_break_dirt_chip_pack/03_final_32x32` 中 4 张审批 PNG；规范为 `Assets/Art/FX/TileBreak/fx_tile_break_dirt_chip_01..04.png`。四图均为 32×32 Sprite/Single、PPU 48、Point、Uncompressed、no mipmap、alpha transparency、Clamp、中心枢轴，`Assets/Art/_Incoming` 最终仅保留 `.gitkeep`。
+- **最小实现**：新增 `TileBreakEffect` 与构建可用的 `Assets/Resources/FX/PF_TileBreak_DirtChip.prefab`。预制体用四个子 ParticleSystem 分别绑定四张贴图和 URP 2D Sprite-Unlit 材质，由根组件每次随机选图发射 4～6 个碎片；World simulation、0.20～0.35 秒寿命、0.6～1.5 速度、0.75～1.0 大小、随机 0～360° 旋转、0.15～0.30 轻微重力、尾部淡出并缩至 72%，Renderer 为 Billboard / Sorting Order 3，0.45 秒后销毁。
+- **挖掘接线**：`DigActionHandler` 在 `DigCell(x,y)` 返回成功且刷新格子后，于 `(x+0.5, y+0.5, -0.3)` 生成效果。非法点击、非 Soil、边界外或 `DigCell` 失败路径均不会生成；粒子仅是表现层，不改变格子、养分扩散、怪物生成或战斗判定。
+- **A/B 验证（未进 Play）**：两个脚本标准校验均为 0 Error / 0 Warning；4/4 Sprite Import Settings、Prefab Resources 加载、根组件四引用、四套材质/贴图对应、粒子模块参数全部通过。Edit Mode 载入 Prefab Contents 做 20 轮实际随机发射，返回值与粒子总数一致且始终为 4～6。GameScene 保持 `isDirty=false`。
+- **工具记录**：首次导入脚本尝试直接写 `TextureImporter.spriteAlignment`，Unity 2022.3 编译器确认该属性不存在，代码未执行、没有资源写入；经反射改为 `TextureImporterSettings.spriteAlignment / spritePivot` 后成功。最终审计最初把序列化 `Custom(9)` 当成非中心枢轴而误报；实际 `spritePivot=(0.5,0.5)`，改为检查真实坐标后全项通过。
+- **边界**：未进入 Play Mode；未修改或保存 Scene、`Assets/Settings`、ProjectSettings、Packages 或 Build Settings；没有接入音效、屏幕震动或对象池；未执行 git。
+- **C 类待人工**：Play Mode 点击合法相邻 Soil，确认每次只在对应格中心出现 4～6 个土屑且约 0.45 秒内消失；点击 Empty、不可挖 Soil 与地图外不应播放。观察速度、大小和遮挡层级是否符合当前镜头，必要时后续只调 Prefab 参数。
+
+### 2026-08-09 TASK-096 视觉修订 — 碎片向相邻格扩散
+
+- **人工反馈**：原速度 0.6～1.5、寿命 0.20～0.35 秒的理论最大位移约 0.53 格，土屑基本被限制在被挖格内部，破坏感偏弱。
+- **修订**：`TileBreakEffect` 默认值和 `PF_TileBreak_DirtChip` 实例同步改为速度 2.2～3.0、寿命 0.28～0.40 秒、0.55 秒自动清理；粒子数量、大小、随机方向、轻微重力、淡出、缩小和成功挖掘触发条件保持不变。理论径向位移约 0.62～1.20 格，可越过当前格但仍小于完整 3×3 区域的 1.5 格半径。
+- **A/B 验证（未进 Play）**：脚本标准校验 0 Error / 0 Warning；Prefab 四个子系统均为 World simulation 与新寿命范围。Edit Mode 载入 Prefab Contents 做 50 轮实际发射，单次始终 4～6 个，观测速度 2.201～2.991、寿命 0.280～0.399；GameScene `isDirty=false`。
+- **边界与 C 类待人工**：未进入 Play Mode、未保存 Scene、未改挖掘判定或美术贴图。请在 Play Mode 观察土屑是否自然进入周围相邻格但没有飞得接近 3×3 外缘；如果仍显得太收或太散，只继续微调 Prefab 速度，不扩大逻辑范围。
+
+### 2026-08-09 TASK-097 — 法师远程战斗逻辑底层
+
+- **职业配置**：`hero_mage_01 / hero_mage_02` 从 Warrior 占位的 `Normal / range 1` 改为 `Ranged / range 8`；现有 `Attack=3 / AttackSpeed=2 / MoveSpeed=2` 保持不变，等待后续实机平衡。
+- **直线索敌与站桩**：`HeroMover` 仅对 `Ranged` 职业改走当前 `FacingDirection` 的直线索敌。`HeroProjectileSystem.FindTarget` 从面前第 1 格扫描到 `AttackRange`，遇非 Walkable Soil 或边界停止；命中索敌后调用独立远程协程，法师保持 idle，使用 `CombatPresentation.PlayDirectionalCast` 让 `Visual` 前顶 0.22 格并返回，释放节奏读取 `AttackSpeed`。近身且可攻击法师的怪物仍能在施法循环中反击。
+- **投射物规则**：新增 100 行 `HeroProjectileSystem`，运行时由 `CombatSystem` 自动挂载，不修改 Scene。火球速度暂为 8 格/秒，以格中心和通道边界推进；进入每个可通行格时检查该格全部叠放怪物并命中第一个存活个体，撞 Soil / 边界即消失。火球不持有目标引用，因此原目标被先行击杀后，其余火球自然继续并可能命中同路线其他魔物。
+- **伤害与死亡分流**：`CombatSystem.ApplyRangedProjectileHit` 复用普通勇者击杀的 `HeroKill → ScatterOrdinaryDeathResources → NotifyMonsterDied → MonsterManager.Remove` 路径；普通近战也改为调用同一私有死亡收口，避免两套清理逻辑漂移。
+- **视觉预留**：运行时尝试加载 `Resources/FX/PF_Hero_Fireball`；当前资源不存在时只创建 `Fireball_LogicOnly` 空节点，所以只有法师前顶 / 返回可见。正式火球 Sprite、飞行特效、命中特效、受击反馈与音效待用户素材到位后另行接入。
+- **工具记录**：新脚本创建后的第一次 `scripts-only` refresh 没有把文件纳入 AssetDatabase，随后 `CombatSystem` 编译暂报 `HeroProjectileSystem` 类型不存在；改用 `force/all` 后 `.meta` 与类型正常导入，最终编译恢复 0 Error / 0 Warning。
+- **验证边界**：按用户要求暂不执行玩法逻辑、Play Mode 或视觉测试；仅逐脚本编译并检查最终 Unity Console 0 Error / 0 Warning。GameScene 未修改或保存，未改 ProjectSettings、Packages、Build Settings、`Assets/Settings`，未执行 git。
+- **后续继续点**：素材到位后创建 `PF_Hero_Fireball` 并检查其默认朝向 / 旋转、飞行排序层、墙面消失位置、连续火球命中、同格复数怪物单体命中，以及两名法师在关卡波次中的站桩与恢复寻路表现。
+
+### 2026-08-09 TASK-098 — 法术投射物图集素材池
+
+- **源资源审查**：外部目录只有 `Spell Projectiles Sprite Sheet.png` 与同名 JSON。JSON 标明 Aseprite 1.3.16.1 导出，图像为 256×896 RGBA；共 224 帧，全部 32×32、未旋转、未裁边、100 ms / 帧。元数据按 28 行组织：Fireball / Ice / Earth / Nature / Air / Arcane / Lightning 七种元素，基础版与 Alternate 1～3 共四个视觉变体，每行八帧。
+- **入库策略**：没有机械拆成 224 个独立 PNG，而是保留单张规范图集 `Assets/Art/FX/Projectiles/fx_spell_projectiles_sheet.png`，以 Sprite Mode Multiple 切片。这样保留单一纹理 / GUID、减少文件和导入开销，同时因为源帧没有 trimming，不存在中心枢轴导致的动画抖动风险。源 PNG 与 `_Incoming` 副本 SHA-256 一致；正式移动使用 AssetDatabase，使 `.meta/GUID` 随行；JSON 完成校验后不复制进项目。
+- **规范命名**：子 Sprite 为 `fx_projectile_<element>_<variant>_<frame>`，元素键为 `fireball / ice / earth / nature / air / arcane / lightning`，变体 `01..04`、帧 `00..07`。物理图集名与切片规则已同步补入 `ART_NAMING_RULES.md`。
+- **动画资产**：在 `Assets/Animations/FX/SpellProjectiles/` 生成 28 个 `anim_fx_projectile_<element>_<variant>.anim`。每个 Clip 根路径绑定 `SpriteRenderer.m_Sprite`，八个关键帧、10 FPS、长度 0.8 秒、Loop Time 开启；不生成 AnimatorController，避免为尚未选定的候选效果制造 28 套无用控制器。
+- **A/B 验证（未进 Play）**：Sprite 224/224，命名正则、32×32 rect、中心 pivot 全部通过；TextureImporter 为 Sprite/Multiple、PPU 48、Point、Uncompressed、no mipmap、alpha transparency、Clamp、maxTextureSize 2048。Clip 28/28 均为 8 个 Sprite 关键帧、10 FPS、根路径 `m_Sprite`、Loop 开启。GameScene `isDirty=false`，`PF_Hero_Fireball` 仍不存在，确认没有提前绑定玩法。
+- **边界**：未进入 Play Mode；未创建 Controller / Prefab / Material；未修改脚本、职业配置、法师投射物逻辑、Scene、`Assets/Settings`、ProjectSettings、Packages 或 Build Settings；未执行 git。
+- **C 类待人工**：在 Project 窗口逐个预览 28 个 Clip，选定法师正式火球候选并说明其源方向；下一小任务再建立 `PF_Hero_Fireball`，处理旋转 / 翻转、世界尺寸、Sorting 与实机飞行 / 撞墙 / 命中观感。
+
+### 2026-08-09 TASK-099 — 法师 Fireball 01 正式视觉绑定
+
+- **人工选择**：用户指定 `anim_fx_projectile_fireball_01` 作为当前两套法师的正式飞行道具表现。该序列源图基准朝右、八帧、10 FPS、0.8 秒循环，原始 Sprite bounds 约 0.67×0.67 格。
+- **资源实现**：创建 `Assets/Resources/FX/anim_fx_projectile_fireball_01_ctrl.controller`，单一默认状态直接播放所选 Clip；创建 `Assets/Resources/FX/PF_Hero_Fireball.prefab`，根节点同时持有 SpriteRenderer 与 Animator，默认首帧为 `fx_projectile_fireball_01_00`，材质沿用 `Sprite-Lit-Default`，Sorting Order 4，无 Collider / Rigidbody / 额外脚本。`Resources.Load<GameObject>("FX/PF_Hero_Fireball")` 验证成功，因此既有 `HeroProjectileSystem` 会自动从逻辑空节点切换为正式视觉。
+- **方向逻辑**：无需修改脚本。`HeroProjectileSystem.Launch` 已将 `FacingDirection` 规格化为四向，并用 `atan2(y,x)` 旋转火球根节点；对朝右基准图的映射为 East 0° / North 90° / West 180° / South -90°。投射物逻辑移动也保存同一个 direction，因此视觉与轨迹同源；发射后法师再次转身不会改变已在途火球。
+- **A/B 验证（未进 Play）**：Controller 仅 1 个状态且 Motion 精确为 `anim_fx_projectile_fireball_01`；Clip 仅绑定根节点 `SpriteRenderer.m_Sprite`，没有 Transform 曲线。Preview Scene 中依次套用四向角度并采样动画，根节点 `transform.right` 与目标方向点积均通过 0.9999 阈值，动画采样不覆盖旋转。Prefab 资源链、首帧、材质、Sorting、Animator、无 Root Motion 均通过，GameScene `isDirty=false`，Unity Console 0 Error / 0 Warning。
+- **边界**：未修改 C# 脚本、法师数值、伤害、速度、撞墙 / 命中规则；未进入 Play Mode；未修改或保存 Scene；未改 `Assets/Settings`、ProjectSettings、Packages 或 Build Settings；未执行 git。
+- **C 类待人工**：Play Mode 分别让法师向右 / 上 / 左 / 下索敌施法，确认火球头部朝飞行方向、约 0.67 格大小可读且 Sorting 合理；继续检查连续火球、撞墙 / 边界消失、原目标提前死亡后继续前进及命中后续魔物。若某一方向看起来倒置，记录方向与截图，后续只调整 Prefab 视觉基准，不改逻辑轨迹。
+
+### 2026-08-09 TASK-100 — 火球尺寸 / 速度与脱手飞行调参
+
+- **问题定位**：Fireball 01 每帧 32×32，而项目统一 PPU 为 48，所以 Scale 1 时世界尺寸只有约 0.667×0.667 格，并非完整一格；`HeroProjectileSystem` 默认速度为 8 格/秒，8 格索敌上限只需约 1 秒飞完，当前 `AttackSpeed=2` 时通常只能短暂看到约两枚，造成偏小、偏快且弹幕感不足。
+- **表现调整**：不破坏全项目 PPU 48 规则，也不重切图集。只把 `PF_Hero_Fireball` 根节点 Scale 改为 `(1.5,1.5,1)`，使 Sprite 实际视觉尺寸精确约 1×1 格；Prefab 仍无 Collider / Rigidbody，逻辑命中范围不随视觉放大。
+- **速度调整**：`HeroProjectileSystem.projectileSpeed` 默认值从 8 改为 4 格/秒。飞行方向、逐格推进、墙 / 边界半格消失、命中首个存活魔物及继续飞行规则全部不变。
+- **解耦确认**：`CombatSystem.ResolveRangedCombat` 的施法间隔仍为 `1 / hero.AttackSpeed`，不读取 projectileSpeed；`HeroProjectileSystem.Launch` 每次都向 `shots` 新增独立 Shot，Update 反向遍历并分别推进全部在途火球，没有单弹完成等待或数量上限。当前 Mage 2 次/秒（0.5 秒一发）、火球 4 格/秒，8 格飞行约 2 秒，目标持续存活时理论约 4 枚可同时在途。
+- **A/B 验证（未进 Play）**：临时 Preview Scene 读取新挂载 `HeroProjectileSystem` 的序列化默认速度为 4；Mage01 / Mage02 AttackSpeed 均为 2。Resources Prefab 的原 Sprite bounds 0.667×0.667、Scale 1.5，计算世界视觉尺寸 1.000×1.000；PPU 仍为 48。静态检查确认独立 `shots.Add`、全 Shot Update 循环及 `1 / AttackSpeed` 释放间隔均保留，GameScene `isDirty=false`，脚本编译与 Unity Console 均为 0 Error / 0 Warning。
+- **边界**：未修改图集 Import Settings、AnimationClip、Controller、火球方向、法师攻速 / 伤害 / 射程、怪物伤害结算、Scene、`Assets/Settings`、ProjectSettings、Packages 或 Build Settings；未进入 Play Mode；未执行 git。
+- **C 类待人工**：Play Mode 在 3～8 格距离观察火球可读性与连续弹幕；确认 1 格大小不会过度遮住单位、4 格/秒仍有速度感，且高 HP 目标前能同时看到多枚火球。若偏慢 / 偏大，下一轮只在 `projectileSpeed` 与 Prefab Scale 两个表现参数中微调，不耦合 AttackSpeed。
+
+### 2026-08-09 TASK-101 — 勇者流血与魔物冲击受击特效
+
+- **素材复用**：使用 TASK-087 已审批并规范入库的 `fx_blood_arc_red_00..03` 与 `fx_attack_impact_white_00..03`，没有新增或重新导入外部图片，因此不新增 ART_INTAKE_LOG 批次。两组原图均为 PPU 48 / Point / Uncompressed；血弧 bounds 约 0.854×0.667 格，白色冲击约 0.458×0.667 格，保持 Scale 1 即可作为短促叠层。
+- **动画与预制体**：新增两个 4 帧、12 FPS、Loop Time 关闭的 Clip 与单状态 Controller；新增构建安全的 `Resources/FX/PF_Hit_Hero_BloodArc`、`PF_Hit_Monster_ImpactWhite`。两者沿用项目 `Sprite-Lit-Default`，Sorting Order 6，无 Collider / Rigidbody / 逻辑脚本，由运行时 0.4 秒自动清理。
+- **运行时接线**：新增 `CombatHitEffectSystem`，由 `CombatSystem.Start` 自动挂载与加载 Resources，不修改 Scene。怪物反击阶段只要至少一个 Crawling 攻击者实际造成伤害，就在勇者视图位置生成一份随机正交旋转的血弧；同格 / 邻格群攻不会按攻击者数量重复喷血。勇者单体近战成功扣血以及法师火球有效命中都会在目标魔物位置生成白色冲击。
+- **方向语义**：白色冲击源图默认朝右，表示攻击者在目标左侧、攻击力向右。近战复用 Hero→Monster 的 `attackDirection`；火球命中新增方向参数并直接复用每枚 Shot 的 `Direction`。统一映射为 Right=0° / Up=90° / Left=180° / Down=-90°，视觉方向与实际攻击轨迹同源。
+- **结算边界**：保留 TASK-085 的受击纯白剪影。特效只在实际成功扣血的结算分支产生；火球致死时先生成冲击再走 `HeroKill` 死亡回流与视图移除。没有修改伤害数值、AttackSpeed、群攻次数、火球速度 / 命中 / 撞墙规则或死亡逻辑。
+- **A/B 验证（未进 Play）**：三个相关脚本标准校验均 0 Error；`HeroProjectileSystem` 保留 1 条既有静态分析 GC Warning，Unity 编译与最终 Console 为 0 Error。两条 Resources 资产链均验证为 4 个根 Sprite 关键帧、12 FPS、非循环、正确 Controller / Clip、Sprite-Lit-Default 与 Sorting 6；定向远程命中重载存在，四向角度映射通过，GameScene `isDirty=false`。
+- **工具记录**：新增 `CombatHitEffectSystem.cs` 后第一次 scripts-only refresh 未生成 `.meta`，导致 `CombatSystem` 暂报新类型不存在；按项目既有换机环境经验改用 force/all refresh 后文件进入 AssetDatabase，最终编译恢复 0 Error。过程中未保存场景或进入 Play Mode。
+- **边界**：未修改或保存 Scene、职业 / 怪物配置、`Assets/Settings`、ProjectSettings、Packages 或 Build Settings；未执行 git。没有对象池、受击音效、死亡动画或屏幕震动。
+- **C 类待人工**：Play Mode 检查四项：①多怪群殴时勇者每次反击阶段只出现一份血弧且方向有变化；②勇者从四向近战魔物时白色冲击朝向与攻击来源一致；③法师四向火球命中也使用对应方向；④致死命中、连续高速命中和白闪叠加时，效果仍清晰且 Sorting 不遮住关键单位。若观感过小或过短，后续只调两个 Prefab 的 Scale / FPS / 生命周期，不改伤害逻辑。
+
+### 2026-08-09 TASK-101 视觉修订 — 魔物冲击可读性
+
+- **实机反馈与定位**：勇者血弧正常，但魔物白色冲击不清晰。复核确认并非单纯主观观感：Slime 的 SpriteRenderer 为 Sorting Order 10，而 `PF_Hit_Monster_ImpactWhite` 只有 Order 6，冲击实际绘制在魔物后方；同时源图只有 22×32px，PPU 48 / Scale 1 时世界尺寸仅约 0.458×0.667 格。
+- **最小修订**：只修改 `PF_Hit_Monster_ImpactWhite`，Sorting Order 从 6 提到 12；根 Scale 从 1 调到 1.5，使视觉尺寸约为 0.688×1.0 格。最大边保持一格，不扩大伤害判定，也不改 Sprite、Clip、Controller、方向旋转或生命周期。
+- **A/B 验证（未进 Play）**：Resources Prefab 重新加载后确认魔物 Order=10、冲击 Order=12；冲击 Scale=(1.5,1.5,1)、世界尺寸=(0.688,1.000)，Animator / Controller 引用保持完整，GameScene `isDirty=false`。本轮无脚本修改。
+- **边界与 C 类待人工**：未进入 Play Mode、未修改或保存 Scene，未改战斗代码、材质、PPU、伤害或音效。请人工复测近战与四向火球命中；若仍偏弱，下一轮优先评估改用 Sprite-Unlit 或略延长帧时长，不再继续盲目放大到格外。
+
+### 2026-08-09 TASK-101 视觉修订 — 勇者血弧可读性
+
+- **实机反馈与定位**：魔物冲击修订后，用户要求同步放大勇者流血。复核发现血弧原图为 41×32px，PPU 48 / Scale 1 时约 0.854×0.667 格；此外勇者 SpriteRenderer 为 Sorting Order 20，而血弧仅为 Order 6，实际同样绘制在角色后方，只因横向像素伸出轮廓而仍然可见。
+- **最小修订**：只修改 `PF_Hit_Hero_BloodArc`，根 Scale 从 1 调到 1.5，视觉尺寸变为约 1.281×1.0 格；Sorting Order 从 6 提到 22，确保绘制在勇者前方。随机四向旋转、4 帧 / 12 FPS、0.4 秒生命周期、群攻阶段单份血弧规则均保持不变。
+- **A/B 验证（未进 Play）**：Resources Prefab 重新加载后确认 Hero Order=20、Blood Order=22，Scale=(1.5,1.5,1)、世界尺寸=(1.281,1.000)，Animator / Controller 引用完整，GameScene `isDirty=false`。本轮无脚本修改。
+- **边界与 C 类待人工**：未进入 Play Mode、未修改或保存 Scene，未改伤害、群攻、材质、PPU 或触发逻辑。请人工复测四个随机方向的血弧，重点确认旋转后约 1.28 格的长边不会显得过度遮挡；若略大，后续只把 Scale 回调到 1.35。

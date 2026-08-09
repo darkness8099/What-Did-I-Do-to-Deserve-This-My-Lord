@@ -2,10 +2,13 @@ using UnityEngine;
 
 public class DigActionHandler : MonoBehaviour
 {
+    private const string TileBreakEffectPath = "FX/PF_TileBreak_DirtChip";
+
     private GridManager gridManager;
     private GridRenderer gridRenderer;
     private MonsterManager monsterManager;
     private MonsterRenderer monsterRenderer;
+    private GameObject tileBreakEffectPrefab;
 
     private void Awake()
     {
@@ -13,6 +16,7 @@ public class DigActionHandler : MonoBehaviour
         gridRenderer = GetComponent<GridRenderer>() ?? FindObjectOfType<GridRenderer>();
         monsterManager = GetComponent<MonsterManager>() ?? FindObjectOfType<MonsterManager>();
         monsterRenderer = GetComponent<MonsterRenderer>() ?? FindObjectOfType<MonsterRenderer>();
+        tileBreakEffectPrefab = Resources.Load<GameObject>(TileBreakEffectPath);
     }
 
     public void HandlePrimaryClick(int x, int y)
@@ -49,6 +53,7 @@ public class DigActionHandler : MonoBehaviour
             return;
 
         gridRenderer.RefreshCell(x, y);
+        SpawnTileBreakEffect(x, y);
         // Cell is Empty now → cannot hold tile attribute resources
 
         if (attr.CanSpawnMonster())
@@ -67,6 +72,13 @@ public class DigActionHandler : MonoBehaviour
         // Leftover resources after spawn (or all resources if no monster spawned) scatter to surrounding Soil
         if (attr.HasResource())
             ResourceFlow.ScatterDigLeftoverResources(new Vector2Int(x, y), attr.Nutrient, attr.Magic, gridManager, $"dig({x},{y})");
+    }
+
+    private void SpawnTileBreakEffect(int x, int y)
+    {
+        if (tileBreakEffectPrefab == null) return;
+        var center = new Vector3(x + 0.5f, y + 0.5f, -0.3f);
+        Instantiate(tileBreakEffectPrefab, center, Quaternion.identity);
     }
 
     private MonsterArchetype ResolveArchetypeForElement(TileElementType element)

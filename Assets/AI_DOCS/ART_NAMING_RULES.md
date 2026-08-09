@@ -103,6 +103,7 @@
 - 示例：`fx_attack_impact_purple_00..03`、`fx_explosion_burst_cyan_00..05`。
 - 对应动画资产使用 `anim_fx_<event>_<variant>.anim` 与 `anim_fx_<event>_<variant>_ctrl.controller`。
 - 原供应商编号只记录在 `ART_INTAKE_LOG.md`，不进入正式文件名。
+- 多类别法术投射物合集的物理图集使用 `fx_spell_projectiles_sheet.png`；子 Sprite 使用 `fx_projectile_<element>_<variant>_<frame>`，例如 `fx_projectile_fireball_01_00..07`。当前元素键为 `fireball / ice / earth / nature / air / arcane / lightning`，视觉变体从 `01` 连续编号，帧从 `00` 连续编号；Clip 使用 `anim_fx_projectile_<element>_<variant>.anim`。
 
 ### 音频命名
 
@@ -194,6 +195,6 @@
 - 后处理 Volume Profile
 - Light2D / 阴影遮罩
 - VFX Graph / Shader Graph 资源
-- Sprite Atlas 切片命名策略（待 Sprite Sheet 接入时定）
+- 通用 Sprite Atlas 打包策略（当前法术投射物图集仅规定切片命名，尚未引入 Sprite Atlas 资产）
 
 （TASK-042 已补：`entrance_*` / `building_*` / `surface_*` / `veg_*` 模板，以及程序化生成池的 `<prefix>_<index>` 简化形式。）
